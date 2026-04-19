@@ -7,13 +7,16 @@ url = os.getenv("BACKEND_URL", "http://backend:8080/logs")
 
 services = ["auth", "db", "api", "payment"]
 levels = ["INFO", "WARN", "ERROR"]
+counter = 0
 
 while True:
     log = {
         "service": random.choice(services),
         "message": f"Event {random.randint(1000,9999)}",
-        "level": random.choice(levels)
+        "level": random.choice(levels),
+        "timestamp": counter
     }
+    counter += 1
 
     try:
         requests.post(url, json=log)

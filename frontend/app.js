@@ -6,5 +6,5 @@ async function fetchLogs() {
     JSON.stringify(data, null, 2);
 }
 
-setInterval(fetchLogs, 2000);
+setInterval(fetchLogs, 1000);
 fetchLogs();
