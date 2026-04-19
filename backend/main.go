@@ -32,8 +32,16 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func receiveLog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	var l Log
-	json.NewDecoder(r.Body).Decode(&l)
+	if err := json.NewDecoder(r.Body).Decode(&l); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
 
 	mu.Lock()
 	logs = append(logs, l)
@@ -45,6 +53,11 @@ func receiveLog(w http.ResponseWriter, r *http.Request) {
 }
 
 func getLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -55,7 +68,16 @@ func getLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/logs", receiveLog)
+	http.HandleFunc("/logs", enableCORS(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			receiveLog(w, r)
+		case http.MethodGet:
+			getLogs(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
 	http.HandleFunc("/logs/all", enableCORS(getLogs))
 
 	log.Println("Backend running on :8080")
