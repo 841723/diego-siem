@@ -1,9 +1,9 @@
 package pipelines
 
 import (
-	"backend/internal/model"
+	// "backend/internal/model"
 )
 
-func formatLog(log model.Log) string {
-	return "[" + log.Service + "] " + log.Message
+func formatLog(log string) string {
+	return "[ log ] " + log
 }

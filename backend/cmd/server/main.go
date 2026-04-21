@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"backend/internal/routes"
+	"backend/internal/lib/logic"
 )
 
 func main() {
@@ -24,6 +25,8 @@ func main() {
 	}))
 
 	routes.RegisterRoutes(r)
+
+	go logic.Logic()
 
 	r.Run(":8080")
 }

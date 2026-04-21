@@ -2,10 +2,9 @@ package logs
 
 import (
 	"net/http"
-
 	"backend/internal/model"
-
 	"github.com/gin-gonic/gin"
+	"backend/internal/lib/logic"
 )
 
 func RegisterRoutes(r *gin.Engine) {
@@ -22,13 +21,13 @@ func RegisterRoutes(r *gin.Engine) {
 
 		
 
-		AddLog(l)
+		logic.AddLog(l)
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	logsGroup.GET("/all", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"logs": GetLogs(),
+			"logs": logic.GetLogs(),
 		})
 	})
 }
