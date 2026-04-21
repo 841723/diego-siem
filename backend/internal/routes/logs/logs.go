@@ -1,7 +1,7 @@
 package logs
 
 import (
-	"backend/internal/lib/logic"
+	"backend/internal/logic"
 	"backend/internal/model"
 	"net/http"
 

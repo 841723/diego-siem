@@ -6,7 +6,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	"backend/internal/lib/logic"
+	"backend/internal/logic"
 	"backend/internal/routes"
 )
 
