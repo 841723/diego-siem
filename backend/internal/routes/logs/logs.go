@@ -3,13 +3,13 @@ package logs
 import (
 	"net/http"
 
-	"backend/internal/app"
+	"backend/internal/logic"
 	"backend/internal/model"
 
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterRoutes(r *gin.Engine, app *app.App) {
+func RegisterRoutes(r *gin.Engine) {
 	logsGroup := r.Group("/logs")
 	logsGroup.POST("/", func(c *gin.Context) {
 		var l model.Log
@@ -19,13 +19,13 @@ func RegisterRoutes(r *gin.Engine, app *app.App) {
 			return
 		}
 
-		app.AddLog(l)
+		logic.AddLog(l)
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Log added successfully"})
 	})
 
 	logsGroup.GET("/all", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"logs": app.GetLogs(),
+			"logs": logic.GetLogs(),
 		})
 	})
 }
