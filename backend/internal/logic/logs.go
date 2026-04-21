@@ -3,18 +3,20 @@ package logic
 import "backend/internal/model"
 
 func AddLog(l model.Log) {
-	Mu.Lock()
-	defer Mu.Unlock()
+	stateMu.Lock()
+	defer stateMu.Unlock()
 
-	if len(Logs) >= maxLogs {
-		Logs = Logs[1:]
+	if len(logs) >= maxLogs {
+		logs = logs[1:]
 	}
-	Logs = append(Logs, l)
+	logs = append(logs, l)
 }
 
 func GetLogs() []model.Log {
-	Mu.Lock()
-	defer Mu.Unlock()
+	stateMu.Lock()
+	defer stateMu.Unlock()
 
-	return Logs
+	logsCopy := make([]model.Log, len(logs))
+	copy(logsCopy, logs)
+	return logsCopy
 }

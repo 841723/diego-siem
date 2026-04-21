@@ -7,15 +7,25 @@ import (
 
 func AddSource(s model.SourceConfig) {
 	s.LogsChannel = LogsChan
+	stateMu.Lock()
 	sourcesList = append(sourcesList, s)
+	stateMu.Unlock()
 	source.NewSyslogServer(s)
 }
 
 func GetSources() []model.SourceConfig {
-	return sourcesList
+	stateMu.Lock()
+	defer stateMu.Unlock()
+
+	sourcesCopy := make([]model.SourceConfig, len(sourcesList))
+	copy(sourcesCopy, sourcesList)
+	return sourcesCopy
 }
 
 func ClearSources() {
+	stateMu.Lock()
+	defer stateMu.Unlock()
+
 	sourcesList = []model.SourceConfig{}
 }
 

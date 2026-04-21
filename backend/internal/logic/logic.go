@@ -8,11 +8,11 @@ import (
 )
 
 var (
-	Logs    []model.Log
+	logs    []model.Log
 	maxLogs = 1000
 )
 
-var Mu sync.Mutex
+var stateMu sync.Mutex
 
 var LogsChan = make(chan model.Log, 100)
 
