@@ -7,10 +7,11 @@ import (
 
 func AddSource(s model.SourceConfig) {
 	s.LogsChannel = LogsChan
+	source.NewSyslogServer(s)
+
 	stateMu.Lock()
 	sourcesList = append(sourcesList, s)
 	stateMu.Unlock()
-	source.NewSyslogServer(s)
 }
 
 func GetSources() []model.SourceConfig {
