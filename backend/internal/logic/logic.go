@@ -18,7 +18,7 @@ var LogsChan = make(chan model.Log, 100)
 
 var sourcesList = []model.SourceConfig{}
 
-func waitLogsFromChannel() {
+func waitForLogsFromChannel() {
 	for {
 		log := <-LogsChan
 		fmt.Printf("Received log from channel: %v\n", log)
@@ -29,5 +29,5 @@ func waitLogsFromChannel() {
 func Logic() {
 	fmt.Println("Logic is running...")
 	initSources()
-	go waitLogsFromChannel()
+	go waitForLogsFromChannel()
 }

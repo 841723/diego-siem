@@ -27,7 +27,7 @@ func main() {
 	logs.RegisterRoutes(r)
 	sources.RegisterRoutes(r)
 
-	go logic.Logic()
+	logic.Logic()
 
 	r.Run(":8080")
 }
