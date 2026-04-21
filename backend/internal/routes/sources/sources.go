@@ -21,7 +21,7 @@ func RegisterRoutes(r *gin.Engine) {
 
 		logic.AddSource(newSource)
 
-		c.JSON(http.StatusOK, gin.H{"message": "Source added successfully"})
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Source added successfully"})
 	})
 
 	sourcesGroup.GET("/", func(c *gin.Context) {
@@ -30,6 +30,6 @@ func RegisterRoutes(r *gin.Engine) {
 
 	sourcesGroup.DELETE("/", func(c *gin.Context) {
 		logic.ClearSources()
-		c.JSON(http.StatusOK, gin.H{"message": "All sources deleted"})
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "All sources deleted"})
 	})
 }
