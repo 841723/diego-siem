@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { createRoot } from "react-dom/client";
 
 function App() {
   const [logs, setLogs] = useState([]);
@@ -45,4 +44,4 @@ function App() {
   );
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+export default App;
