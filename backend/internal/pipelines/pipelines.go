@@ -1,8 +1,6 @@
 package pipelines
 
-import (
-	// "backend/internal/model"
-)
+// "backend/internal/model"
 
 func formatLog(log string) string {
 	return "[ log ] " + log

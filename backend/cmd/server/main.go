@@ -6,8 +6,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	"backend/internal/routes"
 	"backend/internal/lib/logic"
+	"backend/internal/routes"
 )
 
 func main() {
@@ -15,7 +15,6 @@ func main() {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
-
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"*"},

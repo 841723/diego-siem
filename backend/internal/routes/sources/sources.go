@@ -4,8 +4,8 @@ import (
 	// "fmt"
 	"net/http"
 
-	"backend/internal/model"
 	"backend/internal/lib/sources"
+	"backend/internal/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,11 +14,11 @@ func RegisterRoutes(r *gin.Engine) {
 
 	sourcesList := []model.SourceConfig{}
 	firstSource := model.SourceConfig{
-		ID: "1",
-		Port: "9001",
+		ID:       "1",
+		Port:     "9001",
 		Protocol: "udp",
-		Parser: "syslog",
-		Name: "Default Syslog Source",
+		Parser:   "syslog",
+		Name:     "Default Syslog Source",
 	}
 	sourcesList = append(sourcesList, firstSource)
 	for _, source := range sourcesList {
@@ -32,7 +32,7 @@ func RegisterRoutes(r *gin.Engine) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		
+
 		sourcesList = append(sourcesList, newSource)
 
 		sources.NewSyslogServer(newSource)

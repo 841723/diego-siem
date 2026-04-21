@@ -7,10 +7,9 @@ type Log struct {
 }
 
 type SourceConfig struct {
-	ID   	 string `json:"id"`
-	Port 	 string	`json:"port"`
+	ID       string `json:"id"`
+	Port     string `json:"port"`
 	Protocol string `json:"protocol"` // udp, tcp
-	Parser   string `json:"parser"` // syslog, json, etc.
+	Parser   string `json:"parser"`   // syslog, json, etc.
 	Name     string `json:"name"`
 }
-

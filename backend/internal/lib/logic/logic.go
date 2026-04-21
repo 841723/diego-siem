@@ -1,9 +1,9 @@
 package logic
 
 import (
+	"backend/internal/model"
 	"fmt"
 	"sync"
-	"backend/internal/model"
 )
 
 var Logs []model.Log

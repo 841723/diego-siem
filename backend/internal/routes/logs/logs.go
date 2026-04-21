@@ -1,10 +1,11 @@
 package logs
 
 import (
-	"net/http"
-	"backend/internal/model"
-	"github.com/gin-gonic/gin"
 	"backend/internal/lib/logic"
+	"backend/internal/model"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 func RegisterRoutes(r *gin.Engine) {
@@ -17,9 +18,6 @@ func RegisterRoutes(r *gin.Engine) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-
-
-		
 
 		logic.AddLog(l)
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})

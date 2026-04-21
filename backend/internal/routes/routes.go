@@ -1,9 +1,9 @@
 package routes
 
 import (
-
 	"backend/internal/routes/logs"
 	"backend/internal/routes/sources"
+
 	"github.com/gin-gonic/gin"
 )
 

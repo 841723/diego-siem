@@ -4,9 +4,11 @@ import (
 	// "fmt"
 	"encoding/json"
 	"time"
+
 	// syslog "github.com/influxdata/go-syslog/v3/"
-	rfc5424 "github.com/influxdata/go-syslog/v3/rfc5424"
 	"backend/internal/model"
+
+	rfc5424 "github.com/influxdata/go-syslog/v3/rfc5424"
 )
 
 func ParseSyslog(raw string, source string) (*model.Log, error) {
@@ -45,7 +47,7 @@ func ParseSyslog(raw string, source string) (*model.Log, error) {
 	}
 
 	// 4. construir Log final
-	return & model.Log{
+	return &model.Log{
 		Timestamp: ts,
 		Source:    source,
 		Data:      payload,
