@@ -1,14 +1,14 @@
 package sources
 
 import (
-	// "fmt"
 	"net/http"
 
-	"backend/internal/logic"
+	"backend/internal/app"
 	"backend/internal/model"
 
 	"github.com/gin-gonic/gin"
 )
+
 
 func RegisterRoutes(r *gin.Engine) {
 	sourcesGroup := r.Group("/sources")
@@ -19,17 +19,17 @@ func RegisterRoutes(r *gin.Engine) {
 			return
 		}
 
-		logic.AddSource(newSource)
+		app.AddSource(newSource)
 
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Source added successfully"})
 	})
 
 	sourcesGroup.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, logic.GetSources())
+		c.JSON(http.StatusOK, app.GetSources())
 	})
 
 	sourcesGroup.DELETE("/", func(c *gin.Context) {
-		logic.ClearSources()
+		app.ClearSources()
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "All sources deleted"})
 	})
 }

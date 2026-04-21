@@ -1,4 +1,4 @@
-package syslog
+package source
 
 import (
 	"encoding/json"
@@ -14,7 +14,6 @@ import (
 
 type SyslogServer struct {
 	cfg model.SourceConfig
-	logsChannel chan model.Log
 }
 
 func (s *SyslogServer) Start() {
@@ -45,16 +44,19 @@ func (s *SyslogServer) Start() {
 				log.Println("error parsing syslog message:", err)
 				return
 			}
-			s.logsChannel <- *parsed
+			s.cfg.LogsChannel <- *parsed
 		}()
 
 	}
 }
 
-func NewSyslogServer(cfg model.SourceConfig, logsChannel chan model.Log) {
+func (s *SyslogServer) Stop() {
+	// Implementar lógica para detener el servidor si es necesario
+}
+
+func NewSyslogServer(cfg model.SourceConfig) {
 	syslogServer := &SyslogServer{
 		cfg: cfg,
-		logsChannel: logsChannel,
 	}
 	go syslogServer.Start()
 }

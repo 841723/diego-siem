@@ -1,10 +1,6 @@
-package model
+package source
 
-type Log struct {
-	Timestamp int64                  `json:"timestamp"`
-	Source    string                 `json:"source"`
-	Data      map[string]interface{} `json:"data"`
-}
+import "backend/internal/model"
 
 type SourceConfig struct {
 	ID       string `json:"id"`
@@ -13,5 +9,5 @@ type SourceConfig struct {
 	Parser   string `json:"parser"`   // syslog, json, etc.
 	Name     string `json:"name"`
 
-	LogsChannel chan Log `json:"-"`
+	logsChannel chan model.Log
 }
