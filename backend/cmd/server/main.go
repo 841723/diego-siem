@@ -6,20 +6,24 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	"backend/internal/logs"
+	"backend/internal/routes"
 )
 
 func main() {
-	r := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+
+	r := gin.New()
+	r.Use(gin.Recovery())
+
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"http://localhost:3000"},
-		AllowMethods: []string{"GET", "POST"},
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{"*"},
 		AllowHeaders: []string{"Content-Type"},
 		MaxAge:       12 * time.Hour,
 	}))
 
-	logs.RegisterRoutes(r)
+	routes.RegisterRoutes(r)
 
 	r.Run(":8080")
 }
