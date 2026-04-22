@@ -45,8 +45,6 @@ while True:
 
         sock.sendto(msg.encode(), (SYSLOG_HOST, SYSLOG_PORT))
 
-        print("sent:", msg)
-
     except Exception as e:
         print("error:", e)
 

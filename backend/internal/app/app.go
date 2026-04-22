@@ -13,9 +13,6 @@ import (
 )
 
 type App struct {
-	// Array with all logs in memory
-	logs service.LogService
-
 	// Array with all sources in memory
 	sources service.SourceManager
 }
@@ -36,10 +33,10 @@ func (a *App) initAPI() {
 	}))
 
 	// 	/logs
-	routes.LogRegisterRoutes(r, &a.logs)
+	routes.LogRegisterRoutes(r)
 
 	// 	/sources
-	routes.SourcesRegisterRoutes(r, &a.sources, &a.logs)
+	routes.SourcesRegisterRoutes(r, &a.sources)
 
 	r.Run(":8080")
 }
@@ -52,12 +49,11 @@ func (a *App) initSources() {
 		Parser:   "syslog",
 		Name:     "My Syslog Source",
 	}
-	a.sources.AddSource(initialSource, &a.logs)
+	a.sources.AddSource(initialSource)
 }
 
 func New() *App {
 	return &App{
-		logs:    *service.NewLogService(),
 		sources: *service.NewSourceManager(),
 	}
 }

@@ -20,7 +20,6 @@ type SourceConfigRuntime struct {
 
 	ParsedCh  chan model.Log
 	StorageCh chan model.Log
-	SaveIndex *LogService
 
 	StopChan chan struct{}
 }
@@ -45,7 +44,6 @@ func (src *SourceConfigRuntime) waitAndStoreLogs() {
 	for {
 		select {
 		case log := <-src.StorageCh:
-			src.SaveIndex.AddLog(log)
 			storage.StoreLog(log)
 		case <-src.StopChan:
 			return
@@ -64,7 +62,7 @@ func NewSourceManager() *SourceManager {
 	}
 }
 
-func (s *SourceManager) AddSource(cfg model.SourceConfig, saveIndex *LogService) {
+func (s *SourceManager) AddSource(cfg model.SourceConfig) {
 	if cfg.ID == "" || cfg.Port == 0 || cfg.Protocol == "" || cfg.Parser == "" {
 		return
 	}
@@ -85,7 +83,6 @@ func (s *SourceManager) AddSource(cfg model.SourceConfig, saveIndex *LogService)
 		ParsedCh:  parsed_ch,
 		StorageCh: storage_ch,
 		StopChan:  stop_ch,
-		SaveIndex: saveIndex,
 	}
 
 	s.StartSource(cfg.ID)

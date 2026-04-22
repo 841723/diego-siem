@@ -10,6 +10,7 @@ import (
 	"backend/internal/model"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+	// "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 )
 
 type ClickHouseDB struct {
@@ -81,4 +82,32 @@ func (db *ClickHouseDB) LogToDB(log model.Log) error {
 		return fmt.Errorf("failed to insert log: %w", err)
 	}
 	return nil
+}
+
+func (db *ClickHouseDB) GetLogsFromDB() ([]model.Log, error) {
+	ctx := context.Background()
+	rows, err := db.conn.Query(ctx, "SELECT timestamp, source_id, data FROM logs ORDER BY timestamp DESC LIMIT 100")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query logs: %w", err)
+	}
+	defer rows.Close()
+
+	var logs []model.Log
+	for rows.Next() {
+		var log model.Log
+
+		var data map[string]interface{}
+		if err := rows.Scan(&log.Timestamp, &log.SourceID, &data); err != nil {
+			return nil, fmt.Errorf("failed to scan log row: %w", err)
+		}
+		log.Data = data
+
+		logs = append(logs, log)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating log rows: %w", err)
+	}
+
+	return logs, nil
 }

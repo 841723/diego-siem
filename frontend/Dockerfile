@@ -2,9 +2,6 @@ FROM node:20
 
 WORKDIR /app
 
-COPY package.json .
-RUN npm install
+COPY package.json package-lock.json* ./
 
-COPY . .
-
-CMD ["npm", "run", "dev", "--", "--host"]
+CMD ["sh", "-c", "npm install && npm run dev -- --host"]

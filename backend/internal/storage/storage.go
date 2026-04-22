@@ -25,3 +25,11 @@ func StoreLog(log model.Log) error {
 	mainStorage.db.LogToDB(log)
 	return nil
 }
+
+func GetLogs() ([]model.Log, error) {
+	if mainStorage == nil {
+		mainStorage = NewStorage()
+	}
+
+	return mainStorage.db.GetLogsFromDB()
+}
