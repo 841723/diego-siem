@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 type LogEntry = {
+    _row_key: string;
     timestamp: number;
     source_id: string;
     data: Record<string, unknown>;
@@ -35,18 +36,23 @@ type RuleDef = {
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const DEFAULT_COLUMNS = ["timestamp", "source_id"];
+const TIMESTAMP_MS_THRESHOLD = 1_000_000_000_000;
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
 
 const TIME_WINDOWS: Array<{ label: string; value: string; ms: number | null }> = [
-    { label: "Últimos 15 minutos", value: "15m", ms: 15 * 60 * 1000 },
-    { label: "Última hora", value: "1h", ms: 60 * 60 * 1000 },
-    { label: "Últimas 6 horas", value: "6h", ms: 6 * 60 * 60 * 1000 },
-    { label: "Últimas 24 horas", value: "24h", ms: 24 * 60 * 60 * 1000 },
-    { label: "Últimos 7 días", value: "7d", ms: 7 * 24 * 60 * 60 * 1000 },
+    { label: "Últimos 15 minutos", value: "15m", ms: 15 * MINUTE_MS },
+    { label: "Última hora", value: "1h", ms: HOUR_MS },
+    { label: "Últimas 6 horas", value: "6h", ms: 6 * HOUR_MS },
+    { label: "Últimas 24 horas", value: "24h", ms: DAY_MS },
+    { label: "Últimos 7 días", value: "7d", ms: 7 * DAY_MS },
     { label: "Todo", value: "all", ms: null },
 ];
 
 function toTimestampMs(value: number): number {
-    if (value > 1_000_000_000_000) return value;
+    if (value > TIMESTAMP_MS_THRESHOLD) return value;
     return value * 1000;
 }
 
@@ -66,6 +72,38 @@ function sourceIdFromName(name: string): string {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
+}
+
+function generateUniqueId(prefix: string): string {
+    const suffix =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return `${prefix}-${suffix}`;
+}
+
+function upsertById<T extends { id: string }>(items: T[], newItem: T): T[] {
+    return [newItem, ...items.filter((item) => item.id !== newItem.id)];
+}
+
+function normalizeLogs(payload: unknown): LogEntry[] {
+    const rawLogs: Array<Omit<LogEntry, "_row_key">> = Array.isArray(payload)
+        ? payload
+        : Array.isArray((payload as { logs?: unknown[] })?.logs)
+          ? ((payload as { logs: Array<Omit<LogEntry, "_row_key">> }).logs ?? [])
+          : [];
+
+    const duplicatedKeys = new Map<string, number>();
+    return rawLogs.map((log) => {
+        const signature = `${log.source_id}-${log.timestamp}-${JSON.stringify(log.data ?? {})}`;
+        const count = (duplicatedKeys.get(signature) ?? 0) + 1;
+        duplicatedKeys.set(signature, count);
+
+        return {
+            ...log,
+            _row_key: `${signature}-${count}`,
+        };
+    });
 }
 
 async function postJson(path: string, body: object): Promise<{ ok: boolean; message: string }> {
@@ -95,7 +133,8 @@ function App() {
 
     const [logsError, setLogsError] = useState("");
     const [selectedSources, setSelectedSources] = useState<string[]>([]);
-    const [selectedColumns, setSelectedColumns] = useState<string[]>(["timestamp", "source_id"]);
+    const [sourceSelectionTouched, setSourceSelectionTouched] = useState(false);
+    const [selectedColumns, setSelectedColumns] = useState<string[]>(DEFAULT_COLUMNS);
     const [selectedTimeWindow, setSelectedTimeWindow] = useState("1h");
     const [filterText, setFilterText] = useState("");
     const [pageSize, setPageSize] = useState(25);
@@ -128,11 +167,7 @@ function App() {
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const payload = await response.json();
-                const nextLogs: LogEntry[] = Array.isArray(payload)
-                    ? payload
-                    : Array.isArray(payload.logs)
-                      ? payload.logs
-                      : [];
+                const nextLogs = normalizeLogs(payload);
 
                 if (!cancelled) {
                     setLogs(nextLogs);
@@ -159,7 +194,7 @@ function App() {
 
         async function fetchSources() {
             try {
-                const response = await fetch(`${API_BASE}/sources/`);
+                const response = await fetch(`${API_BASE}/sources`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const payload = await response.json();
@@ -190,17 +225,21 @@ function App() {
     }, [logs, sources]);
 
     useEffect(() => {
-        if (sourceIds.length === 0) {
-            setSelectedSources([]);
-            return;
-        }
+            if (sourceIds.length === 0) {
+                setSelectedSources([]);
+                return;
+            }
 
-        setSelectedSources((prev) => {
-            if (prev.length === 0) return sourceIds;
-            const valid = prev.filter((sourceId) => sourceIds.includes(sourceId));
-            return valid.length === 0 ? sourceIds : valid;
-        });
-    }, [sourceIds]);
+            setSelectedSources((prev) => {
+                const valid = prev.filter((sourceId) => sourceIds.includes(sourceId));
+
+                if (!sourceSelectionTouched && (prev.length === 0 || valid.length === 0)) {
+                    return sourceIds;
+                }
+
+                return valid;
+            });
+    }, [sourceIds, sourceSelectionTouched]);
 
     const availableColumns = useMemo(() => {
         const set = new Set<string>(["timestamp", "source_id"]);
@@ -220,7 +259,7 @@ function App() {
         setSelectedColumns((prev) => {
             const normalized = prev.filter((column) => availableColumns.includes(column));
             if (normalized.length > 0) return normalized;
-            return ["timestamp", "source_id"];
+            return DEFAULT_COLUMNS;
         });
     }, [availableColumns]);
 
@@ -229,8 +268,9 @@ function App() {
         const selectedWindow = TIME_WINDOWS.find((window) => window.value === selectedTimeWindow) ?? TIME_WINDOWS[1];
 
         return logs.filter((log) => {
-            if (selectedSources.length > 0 && !selectedSources.includes(log.source_id)) {
-                return false;
+            if (sourceIds.length > 0) {
+                if (selectedSources.length === 0) return false;
+                if (!selectedSources.includes(log.source_id)) return false;
             }
 
             if (selectedWindow.ms !== null) {
@@ -262,6 +302,7 @@ function App() {
 
     function toggleSource(sourceId: string) {
         setCurrentPage(1);
+        setSourceSelectionTouched(true);
         setSelectedSources((prev) =>
             prev.includes(sourceId) ? prev.filter((item) => item !== sourceId) : [...prev, sourceId],
         );
@@ -277,7 +318,8 @@ function App() {
     async function handleCreateSource(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
 
-        const generatedId = sourceIdFromName(sourceName) || `source-${Date.now()}`;
+        const baseId = sourceIdFromName(sourceName);
+        const generatedId = baseId || generateUniqueId("source");
         const source: SourceConfig = {
             id: generatedId,
             name: sourceName,
@@ -288,9 +330,9 @@ function App() {
             index_id: sourceMappingId,
         };
 
-        const apiResult = await postJson("/sources/", source);
+        const apiResult = await postJson("/sources", source);
 
-        setSources((prev) => [source, ...prev.filter((item) => item.id !== source.id)]);
+        setSources((prev) => upsertById(prev, source));
         setSourceName("");
         setSourcePort(9001);
         setSourcePipelineId("");
@@ -317,7 +359,7 @@ function App() {
         };
 
         const apiResult = await postJson("/mappings", mapping);
-        setMappings((prev) => [mapping, ...prev.filter((item) => item.id !== mapping.id)]);
+        setMappings((prev) => upsertById(prev, mapping));
         setMappingId("");
         setMappingFields("");
 
@@ -342,7 +384,7 @@ function App() {
         };
 
         const apiResult = await postJson("/pipelines", pipeline);
-        setPipelines((prev) => [pipeline, ...prev.filter((item) => item.id !== pipeline.id)]);
+        setPipelines((prev) => upsertById(prev, pipeline));
         setPipelineId("");
         setPipelineProcessors("");
 
@@ -364,7 +406,7 @@ function App() {
         };
 
         const apiResult = await postJson("/rules", rule);
-        setRules((prev) => [rule, ...prev.filter((item) => item.id !== rule.id)]);
+        setRules((prev) => upsertById(prev, rule));
         setRuleId("");
         setRuleQuery("");
         setRuleInterval(60);
@@ -496,8 +538,8 @@ function App() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {paginatedLogs.map((log, index) => (
-                                    <tr key={`${log.source_id}-${log.timestamp}-${index}`} className='odd:bg-slate-900 even:bg-slate-950'>
+                                {paginatedLogs.map((log) => (
+                                    <tr key={log._row_key} className='odd:bg-slate-900 even:bg-slate-950'>
                                         {selectedColumns.map((column) => (
                                             <td key={column} className='border-b border-slate-800 p-2 align-top'>
                                                 {column === "timestamp"
@@ -666,6 +708,7 @@ function App() {
                             onChange={(event) => setRuleInterval(Number(event.target.value))}
                             required
                         />
+                        <p className='text-xs text-slate-400'>Intervalo (segundos)</p>
                         <input
                             className='w-full rounded border border-slate-700 bg-slate-950 p-2'
                             placeholder='Acción. Ej: webhook:https://...'
