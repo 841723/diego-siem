@@ -11,10 +11,11 @@ import (
 
 type SourceHandler struct {
 	svc *service.SourceManager
+	logs *service.LogService
 }
 
-func NewSourceHandler(svc *service.SourceManager) *SourceHandler {
-	return &SourceHandler{svc: svc}
+func NewSourceHandler(svc *service.SourceManager, logs *service.LogService) *SourceHandler {
+	return &SourceHandler{svc: svc, logs: logs}
 }
 
 func (h *SourceHandler) AddSource(c *gin.Context) {
@@ -25,7 +26,7 @@ func (h *SourceHandler) AddSource(c *gin.Context) {
 		return
 	}
 
-	h.svc.AddSource(cfg)
+	h.svc.AddSource(cfg, h.logs)
 
 	c.Status(http.StatusOK)
 }
@@ -40,8 +41,8 @@ func (h *SourceHandler) ClearSources(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func SourcesRegisterRoutes(r *gin.Engine, svc *service.SourceManager) {
-	handler := NewSourceHandler(svc)
+func SourcesRegisterRoutes(r *gin.Engine, svc *service.SourceManager, defaultLogs *service.LogService) {
+	handler := NewSourceHandler(svc, defaultLogs)
 	sourcesGroup := r.Group("/sources")
 
 	sourcesGroup.POST("/", handler.AddSource)

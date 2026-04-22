@@ -17,10 +17,38 @@ import (
 type SourceConfigRuntime struct {
 	Config model.SourceConfig
 
-	ParsedCh  chan model.Log
-	StorageCh chan model.Log
+	ParsedCh   chan model.Log
+	StorageCh  chan model.Log
+	SaveIndex *LogService
 
 	StopChan chan struct{}
+}
+
+func (src *SourceConfigRuntime) waitAndProcessLogs() {
+	for {
+		select {
+		case log := <-src.ParsedCh:
+			log, err := pipelines.ProcessLog(log, src.Config.Pipeline)
+			if err != nil {
+				// Handle error
+				continue
+			}
+			src.StorageCh <- log
+		case <-src.StopChan:
+			return
+		}
+	}
+}
+
+func (src *SourceConfigRuntime) waitAndStoreLogs() {
+	for {
+		select {
+		case log := <-src.StorageCh:
+			src.SaveIndex.AddLog(log)
+		case <-src.StopChan:
+			return
+		}
+	}
 }
 
 type SourceManager struct {
@@ -34,7 +62,7 @@ func NewSourceManager() *SourceManager {
 	}
 }
 
-func (s *SourceManager) AddSource(cfg model.SourceConfig) {
+func (s *SourceManager) AddSource(cfg model.SourceConfig, saveIndex *LogService) {
 	if cfg.ID == "" || cfg.Port == 0 || cfg.Protocol == "" || cfg.Parser == "" {
 		return
 	}
@@ -51,10 +79,11 @@ func (s *SourceManager) AddSource(cfg model.SourceConfig) {
 	stop_ch := make(chan struct{})
 
 	s.sources[cfg.ID] = &SourceConfigRuntime{
-		Config:    cfg,
-		ParsedCh:  parsed_ch,
-		StorageCh: storage_ch,
-		StopChan:  stop_ch,
+		Config:     cfg,
+		ParsedCh:   parsed_ch,
+		StorageCh:  storage_ch,
+		StopChan:   stop_ch,
+		SaveIndex:  saveIndex,
 	}
 
 	s.StartSource(cfg.ID)
@@ -88,8 +117,8 @@ func (s *SourceManager) StartSource(id string) {
 		source.StartSyslogServer(src.Config, src.ParsedCh)
 	}
 
-	go waitAndProcessLogs(src.ParsedCh, src.Config.Pipeline, src.StorageCh, src.StopChan)
-	go waitAndStoreLogs(src.StorageCh, src.Config.Index, src.StopChan)
+	go src.waitAndProcessLogs()
+	go src.waitAndStoreLogs()
 }
 
 func (s *SourceManager) StopSource(id string) {
@@ -103,35 +132,4 @@ func (s *SourceManager) StopSource(id string) {
 
 	close(src.StopChan)
 	delete(s.sources, id)
-}
-
-func waitAndProcessLogs(inCh <-chan model.Log, pipeline_id string, outCh chan<- model.Log, stopCh <-chan struct{}) {
-	for {
-		select {
-		case log := <-inCh:
-			log, err := pipelines.ProcessLog(log, pipeline_id)
-			if err != nil {
-				// Handle error
-				continue
-			}
-			outCh <- log
-		case <-stopCh:
-			return
-		}
-	}
-}
-
-func waitAndStoreLogs(inCh <-chan model.Log, index_id string, stopCh <-chan struct{}) {
-	for {
-		select {
-		case log := <-inCh:
-			err := pipelines.StorageLog(log, index_id)
-			if err != nil {
-				// Handle error
-				continue
-			}
-		case <-stopCh:
-			return
-		}
-	}
 }

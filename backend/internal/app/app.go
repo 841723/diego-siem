@@ -37,7 +37,7 @@ func (a *App) initAPI() {
 	routes.LogRegisterRoutes(r, &a.logs)
 
 	// 	/sources
-	routes.SourcesRegisterRoutes(r, &a.sources)
+	routes.SourcesRegisterRoutes(r, &a.sources, &a.logs)
 
 	r.Run(":8080")
 }
@@ -50,7 +50,7 @@ func (a *App) initSources() {
 		Parser:   "syslog",
 		Name:     "My Syslog Source",
 	}
-	a.sources.AddSource(initialSource)
+	a.sources.AddSource(initialSource, &a.logs)
 }
 
 func New() *App {
