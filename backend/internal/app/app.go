@@ -2,12 +2,11 @@ package app
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"backend/internal/model"
-	"backend/internal/routes/logs"
-	"backend/internal/routes/sources"
+	"backend/internal/routes"
+	"backend/internal/service"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -15,25 +14,10 @@ import (
 
 type App struct {
 	// Array with all logs in memory
-	Logs    []model.Log
-	maxLogs int
-
-	// Mutex to protect access to Logs
-	Mu sync.Mutex
-
-	// Channel to receive logs from sources
-	LogsChan chan model.Log
+	logs service.LogService
 
 	// Array with all sources in memory
-	sourcesList []model.SourceConfig
-}
-
-func (a *App) waitLogsFromChallenge() {
-	for {
-		log := <-a.LogsChan
-		fmt.Printf("Received log from channel: %v\n", log)
-		a.AddLog(log)
-	}
+	sources service.SourceManager
 }
 
 func (a *App) initAPI() {
@@ -50,25 +34,34 @@ func (a *App) initAPI() {
 	}))
 
 	// 	/logs
-	logs.RegisterRoutes(r)
+	routes.LogRegisterRoutes(r, &a.logs)
 
 	// 	/sources
-	sources.RegisterRoutes(r)
+	routes.SourcesRegisterRoutes(r, &a.sources)
 
 	r.Run(":8080")
 }
 
-func NewApp() *App {
+func (a *App) initSources() {
+	initialSource := model.SourceConfig{
+		ID:       "1",
+		Protocol: "udp",
+		Port:     9001,
+		Parser:   "syslog",
+		Name:     "My Syslog Source",
+	}
+	a.sources.AddSource(initialSource)
+}
+
+func New() *App {
 	return &App{
-		Logs:       []model.Log{},
-		maxLogs:    1000,
-		LogsChan:   make(chan model.Log, 100),
-		sourcesList: []model.SourceConfig{},
+		logs:    *service.NewLogService(),
+		sources: *service.NewSourceManager(),
 	}
 }
 
 func Run() {
-	app := NewApp()
+	app := New()
 
 	app.initAPI()
 	fmt.Println("API initialized")
@@ -77,5 +70,7 @@ func Run() {
 	fmt.Println("Sources initialized")
 
 	fmt.Println("Waiting for logs from sources...")
-	app.waitLogsFromChallenge()
+
+	for {
+	}
 }

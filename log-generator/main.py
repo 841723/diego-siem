@@ -35,7 +35,7 @@ while True:
         "service": random.choice(services),
         "message": f"Event {random.randint(1000,9999)}",
         "level": random.choice(levels),
-        "timestamp": counter
+        "numseq": counter
     }
     counter += 1
 

@@ -1,7 +1,11 @@
 package pipelines
 
-// "backend/internal/model"
+import "backend/internal/model"
 
-func formatLog(log string) string {
-	return "[ log ] " + log
+func ProcessLog(log model.Log, pipeline_id string) (model.Log, error) {
+	return log, nil
+}
+
+func StorageLog(log model.Log, index_id string) error {
+	return nil
 }

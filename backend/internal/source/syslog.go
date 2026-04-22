@@ -13,11 +13,12 @@ import (
 )
 
 type SyslogServer struct {
-	cfg model.SourceConfig
+	cfg        model.SourceConfig
+	outChannel chan<- model.Log
 }
 
 func (s *SyslogServer) Start() {
-	addr := fmt.Sprintf(":%s", s.cfg.Port)
+	addr := fmt.Sprintf(":%d", s.cfg.Port)
 	fmt.Printf("Starting syslog server on addr %s with protocol %s\n", addr, s.cfg.Protocol)
 
 	conn, err := net.ListenPacket(s.cfg.Protocol, addr)
@@ -37,16 +38,17 @@ func (s *SyslogServer) Start() {
 		}
 
 		raw := string(buf[:n])
-
 		go func() {
-			parsed, err := ParseSyslog(raw, s.cfg.Name)
+			log.Printf("Received syslog message: %s\n", raw)
+
+			parsedLog, err := parseSyslog(raw, s.cfg.Name)
 			if err != nil {
-				log.Println("error parsing syslog message:", err)
+				log.Printf("Error parsing syslog message: %v\n", err)
 				return
 			}
-			s.cfg.LogsChannel <- *parsed
-		}()
 
+			s.outChannel <- *parsedLog
+		}()
 	}
 }
 
@@ -54,14 +56,15 @@ func (s *SyslogServer) Stop() {
 	// Implementar lógica para detener el servidor si es necesario
 }
 
-func NewSyslogServer(cfg model.SourceConfig) {
+func StartSyslogServer(cfg model.SourceConfig, outChannel chan<- model.Log) {
 	syslogServer := &SyslogServer{
-		cfg: cfg,
+		cfg:        cfg,
+		outChannel: outChannel,
 	}
 	go syslogServer.Start()
 }
 
-func ParseSyslog(raw string, source string) (*model.Log, error) {
+func parseSyslog(raw string, source string) (*model.Log, error) {
 	p := rfc5424.NewParser(rfc5424.WithBestEffort())
 
 	m, err := p.Parse([]byte(raw))
@@ -94,7 +97,7 @@ func ParseSyslog(raw string, source string) (*model.Log, error) {
 
 	return &model.Log{
 		Timestamp: ts,
-		Source:    source,
+		SourceID:  source,
 		Data:      payload,
 	}, nil
 }
