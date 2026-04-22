@@ -12,7 +12,7 @@ services:
     depends_on:
       - clickhouse
     working_dir: /app
-    command: air   # 👈 hot reload Go
+    command: air
 
   frontend:
     build: ./frontend
@@ -54,6 +54,7 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - clickhouse_logs:/var/log/clickhouse-server
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
 
 volumes:
   clickhouse_data:
