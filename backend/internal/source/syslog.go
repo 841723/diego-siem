@@ -38,9 +38,8 @@ func (s *SyslogServer) Start() {
 		}
 
 		raw := string(buf[:n])
+		// fmt.Printf("Received raw syslog message: %s\n", raw)
 		go func() {
-			log.Printf("Received syslog message: %s\n", raw)
-
 			parsedLog, err := parseSyslog(raw, s.cfg.Name)
 			if err != nil {
 				log.Printf("Error parsing syslog message: %v\n", err)

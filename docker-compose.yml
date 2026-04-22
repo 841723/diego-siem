@@ -1,23 +1,59 @@
 services:
   backend:
     build: ./backend
+    container_name: siem-backend
     ports:
       - "8080:8080"
     volumes:
       - ./backend:/app
+    environment:
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=9000
+    depends_on:
+      - clickhouse
     working_dir: /app
     command: air   # 👈 hot reload Go
 
-  log-generator:
-    build: ./log-generator
-    volumes:
-      - ./log-generator:/app
-    working_dir: /app
-    command: python main.py
-
   frontend:
     build: ./frontend
+    container_name: siem-frontend
     ports:
-      - "5173:5173"
+      - "3000:3000"
     volumes:
-      - ./frontend:/usr/share/nginx/html
+      - ./frontend:/app
+    environment:
+      - BACKEND_URL=http://backend:8080
+
+  log-generator:
+    build: ./log-generator
+    container_name: siem-generator
+    environment:
+      - SYSLOG_HOST=backend
+      - SYSLOG_PORT=9001
+    working_dir: /app
+    command: python main.py
+    depends_on:
+      - backend
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: siem-clickhouse
+    ports:
+      - "8123:8123"   # HTTP interface
+      - "9000:9000"   # native protocol
+    environment:
+      - CLICKHOUSE_DB=siem
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=default
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+
+volumes:
+  clickhouse_data:
+  clickhouse_logs:

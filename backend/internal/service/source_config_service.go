@@ -6,6 +6,7 @@ import (
 	"backend/internal/model"
 	"backend/internal/pipelines"
 	"backend/internal/source"
+	"backend/internal/storage"
 )
 
 /*
@@ -17,8 +18,8 @@ import (
 type SourceConfigRuntime struct {
 	Config model.SourceConfig
 
-	ParsedCh   chan model.Log
-	StorageCh  chan model.Log
+	ParsedCh  chan model.Log
+	StorageCh chan model.Log
 	SaveIndex *LogService
 
 	StopChan chan struct{}
@@ -45,6 +46,7 @@ func (src *SourceConfigRuntime) waitAndStoreLogs() {
 		select {
 		case log := <-src.StorageCh:
 			src.SaveIndex.AddLog(log)
+			storage.StoreLog(log)
 		case <-src.StopChan:
 			return
 		}
@@ -79,11 +81,11 @@ func (s *SourceManager) AddSource(cfg model.SourceConfig, saveIndex *LogService)
 	stop_ch := make(chan struct{})
 
 	s.sources[cfg.ID] = &SourceConfigRuntime{
-		Config:     cfg,
-		ParsedCh:   parsed_ch,
-		StorageCh:  storage_ch,
-		StopChan:   stop_ch,
-		SaveIndex:  saveIndex,
+		Config:    cfg,
+		ParsedCh:  parsed_ch,
+		StorageCh: storage_ch,
+		StopChan:  stop_ch,
+		SaveIndex: saveIndex,
 	}
 
 	s.StartSource(cfg.ID)

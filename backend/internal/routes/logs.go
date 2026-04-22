@@ -39,6 +39,6 @@ func LogRegisterRoutes(r *gin.Engine, svc *service.LogService) {
 	handler := NewLogHandler(svc)
 	logsGroup := r.Group("/logs")
 
-	logsGroup.POST("/", handler.AddLog)
-	logsGroup.GET("/all", handler.GetLogs)
+	logsGroup.POST("", handler.AddLog)
+	logsGroup.GET("", handler.GetLogs)
 }

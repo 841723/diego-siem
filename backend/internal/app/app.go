@@ -27,10 +27,12 @@ func (a *App) initAPI() {
 	r.Use(gin.Recovery())
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"*"},
-		AllowMethods: []string{"*"},
-		AllowHeaders: []string{"Content-Type"},
-		MaxAge:       12 * time.Hour,
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: false,
+		MaxAge:           12 * time.Hour,
 	}))
 
 	// 	/logs
@@ -63,14 +65,11 @@ func New() *App {
 func Run() {
 	app := New()
 
-	app.initAPI()
-	fmt.Println("API initialized")
-
-	go app.initSources()
 	fmt.Println("Sources initialized")
+	go app.initSources()
 
 	fmt.Println("Waiting for logs from sources...")
 
-	for {
-	}
+	fmt.Println("API initialized")
+	app.initAPI()
 }

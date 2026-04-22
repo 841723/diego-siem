@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { use, useEffect, useState } from "react";
 
 function App() {
   const [logs, setLogs] = useState([]);
+  const [health, setHealth] = useState("unknown");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -27,7 +28,7 @@ function App() {
     }
 
     fetchLogs();
-    const interval = setInterval(fetchLogs, 2000);
+    const interval = setInterval(fetchLogs, 1000);
 
     return () => {
       cancelled = true;
