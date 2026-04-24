@@ -1,3 +1,3 @@
 #!/bin/bash
 
-docker compose down
+sudo docker compose down

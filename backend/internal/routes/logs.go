@@ -36,5 +36,5 @@ func LogRegisterRoutes(r *gin.Engine) {
 	logsGroup.GET("", GetLogs)
 	logsGroup.GET("/:id", GetLogs)
 
-	logsGroup.DELETE("/all", 
+	logsGroup.DELETE("/all", DeleteLogs)
 }

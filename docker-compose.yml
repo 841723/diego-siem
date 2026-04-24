@@ -6,7 +6,6 @@ services:
       - "8080:8080"
     volumes:
       - ./backend:/app
-    user: "${USER_ID}:${GROUP_ID}"
     environment:
       - CLICKHOUSE_HOST=clickhouse
       - CLICKHOUSE_PORT=9000
@@ -23,7 +22,6 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    user: "${USER_ID}:${GROUP_ID}"
     environment:
       - BACKEND_URL=http://backend:8080
 
@@ -33,7 +31,6 @@ services:
     environment:
       - SYSLOG_HOST=backend
       - SYSLOG_PORT=9001
-    user: "${USER_ID}:${GROUP_ID}"
     working_dir: /app
     command: python main.py
     depends_on:
