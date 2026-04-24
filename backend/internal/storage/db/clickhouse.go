@@ -84,9 +84,9 @@ func (db *ClickHouseDB) LogToDB(log model.Log) error {
 	return nil
 }
 
-func (db *ClickHouseDB) GetLogsFromDB() ([]model.Log, error) {
+func (db *ClickHouseDB) GetLogsFromDB(logID string) ([]model.Log, error) {
 	ctx := context.Background()
-	rows, err := db.conn.Query(ctx, "SELECT timestamp, source_id, data FROM logs ORDER BY timestamp DESC LIMIT 100")
+	rows, err := db.conn.Query(ctx, "SELECT timestamp, source_id, data FROM logs WHERE source_id = ? ORDER BY timestamp DESC LIMIT 100", logID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logs: %w", err)
 	}
@@ -110,4 +110,13 @@ func (db *ClickHouseDB) GetLogsFromDB() ([]model.Log, error) {
 	}
 
 	return logs, nil
+}
+
+func (db *ClickHouseDB) DeleteLogsFromDB() error {
+	ctx := context.Background()
+	err := db.conn.Exec(ctx, "TRUNCATE TABLE logs")
+	if err != nil {
+		return fmt.Errorf("failed to delete logs: %w", err)
+	}
+	return nil
 }
