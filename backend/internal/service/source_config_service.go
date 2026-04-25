@@ -24,7 +24,7 @@ type SourceConfigRuntime struct {
 	StopChan chan struct{}
 }
 
-func (src *SourceConfigRuntime) waitAndProcessLogs() {
+func (src *SourceConfigRuntime) waitAndProcessLogs(s *storage.Storage) {
 	for {
 		select {
 		case log := <-src.ParsedCh:
@@ -40,11 +40,11 @@ func (src *SourceConfigRuntime) waitAndProcessLogs() {
 	}
 }
 
-func (src *SourceConfigRuntime) waitAndStoreLogs() {
+func (src *SourceConfigRuntime) waitAndStoreLogs(s *storage.Storage) {
 	for {
 		select {
 		case log := <-src.StorageCh:
-			storage.StoreLog(log)
+			s.StoreLog(log)
 		case <-src.StopChan:
 			return
 		}
@@ -53,12 +53,14 @@ func (src *SourceConfigRuntime) waitAndStoreLogs() {
 
 type SourceManager struct {
 	sources map[string]*SourceConfigRuntime
+	storage *storage.Storage
 	mu      sync.Mutex
 }
 
-func NewSourceManager() *SourceManager {
+func NewSourceManager(s *storage.Storage) *SourceManager {
 	return &SourceManager{
 		sources: make(map[string]*SourceConfigRuntime),
+		storage: s,
 	}
 }
 
@@ -116,8 +118,8 @@ func (s *SourceManager) StartSource(id string) {
 		source.StartSyslogServer(src.Config, src.ParsedCh)
 	}
 
-	go src.waitAndProcessLogs()
-	go src.waitAndStoreLogs()
+	go src.waitAndProcessLogs(s.storage)
+	go src.waitAndStoreLogs(s.storage)
 }
 
 func (s *SourceManager) StopSource(id string) {

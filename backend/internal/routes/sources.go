@@ -5,16 +5,18 @@ import (
 
 	"backend/internal/model"
 	"backend/internal/service"
+	"backend/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
 
 type SourceHandler struct {
 	svc *service.SourceManager
+	storage *storage.Storage
 }
 
-func NewSourceHandler(svc *service.SourceManager) *SourceHandler {
-	return &SourceHandler{svc: svc}
+func NewSourceHandler(svc *service.SourceManager, storage *storage.Storage) *SourceHandler {
+	return &SourceHandler{svc: svc, storage: storage}
 }
 
 func (h *SourceHandler) AddSource(c *gin.Context) {
@@ -40,8 +42,8 @@ func (h *SourceHandler) ClearSources(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func SourcesRegisterRoutes(r *gin.Engine, svc *service.SourceManager) {
-	handler := NewSourceHandler(svc)
+func SourcesRegisterRoutes(r *gin.Engine, svc *service.SourceManager, storage *storage.Storage) {
+	handler := NewSourceHandler(svc, storage)
 	sourcesGroup := r.Group("/sources")
 
 	sourcesGroup.POST("/", handler.AddSource)

@@ -6,37 +6,41 @@ import (
 )
 
 type Storage struct {
-	db db.ClickHouseDB
+	clickhouse *db.ClickHouseDB
+	postgres   *db.PostgreSQLDB
 }
 
 func NewStorage() *Storage {
 	return &Storage{
-		db: *db.NewClickHouseDB(),
+		clickhouse: db.NewClickHouseDB(),
+		postgres:   db.NewPostgreSQLDB(),
 	}
 }
 
-var mainStorage *Storage
-
-func checkStorage() {
-	if mainStorage == nil {
-		mainStorage = NewStorage()
-	}
+func (s *Storage) StoreLog(log model.Log) error {
+	return s.clickhouse.LogToDB(log)
 }
 
-func StoreLog(log model.Log) error {
-	checkStorage()
-	mainStorage.db.LogToDB(log)
-	return nil
+func (s *Storage) GetLogs(logID string) ([]model.Log, error) {
+	return s.clickhouse.GetLogsFromDB(logID)
 }
 
-func GetLogs(logID string) ([]model.Log, error) {
-	checkStorage()
-
-	return mainStorage.db.GetLogsFromDB(logID)
+func (s *Storage) DeleteLogs() error {
+	return s.clickhouse.DeleteLogsFromDB()
 }
 
-func DeleteLogs() error {
-	checkStorage()
+func (s *Storage) GetSources() ([]model.SourceConfig, error) {
+	return s.postgres.GetSourcesFromDB()
+}
 
-	return mainStorage.db.DeleteLogsFromDB()
+func (s *Storage) AddSource(source model.SourceConfig) error {
+	return s.postgres.AddSourceToDB(source)
+}
+
+func (s *Storage) DeleteSource(sourceID string) error {
+	return s.postgres.DeleteSourceFromDB(sourceID)
+}
+
+func (s *Storage) ClearSources() error {
+	return s.postgres.ClearSourcesFromDB()
 }
