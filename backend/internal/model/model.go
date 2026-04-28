@@ -2,7 +2,7 @@ package model
 
 type Log struct {
 	Timestamp int64                  `json:"timestamp"`
-	SourceID  string                 `json:"source_id"`
+	SourceID  int                    `json:"sourceid"`
 	Data      map[string]interface{} `json:"data"`
 }
 

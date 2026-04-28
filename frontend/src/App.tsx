@@ -9,7 +9,7 @@ function App() {
 
         async function fetchLogs() {
             try {
-                const res = await fetch("http://localhost:8080/logs");
+                const res = await fetch("http://localhost:8080/logs/1");
                 if (!res.ok) {
                     throw new Error(`HTTP ${res.status}`);
                 }
@@ -39,7 +39,11 @@ function App() {
         <main className='p-4 bg-gray-700 min-h-screen text-white'>
             <h1 className='text-3xl font-bold mb-4'>Logs</h1>
             <span>
-                {logs.length} {logs.length !== 1 ? "logs" : "log"} loaded
+                { logs && logs.length > 0 && (
+                    <p>
+                        {logs.length} {logs.length !== 1 ? "logs" : "log"} loaded
+                    </p>
+                )}
             </span>
             {error && <p>{error}</p>}
             <table className='w-full mt-4 border-collapse'>
@@ -57,13 +61,13 @@ function App() {
                     </tr>
                 </thead>
                 <tbody>
-                    {logs.map((log: any, index) => (
+                    {logs && logs.map((log: any, index) => (
                         <tr key={index}>
                             <td className='border-b border-gray-500 p-2'>
                                 {log.timestamp}
                             </td>
                             <td className='border-b border-gray-500 p-2'>
-                                {log.source_id}
+                                {log.sourceid}
                             </td>
                             <td className='border-b border-gray-500 p-2'>
                                 {JSON.stringify(log.data)}

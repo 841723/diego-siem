@@ -37,5 +37,5 @@ CREATE TABLE SourceConfig (
 INSERT INTO Pipelines (Name, Description) VALUES 
 ('Default Pipeline', 'A default processing pipeline for network data.');
 
-INSERT INTO SourceConfig (Port, Protocol, Parser, Name, PipelineID) VALUES 
-(9001, 'udp', 'syslog_parser', 'Default Source', 1);
+-- INSERT INTO SourceConfig (Port, Protocol, Parser, Name, PipelineID) VALUES 
+-- (9001, 'udp', 'syslog_parser', 'Default Source', 1);

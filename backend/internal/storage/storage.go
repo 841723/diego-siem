@@ -21,7 +21,7 @@ func (s *Storage) StoreLog(log model.Log) error {
 	return s.clickhouse.LogToDB(log)
 }
 
-func (s *Storage) GetLogs(logID string) ([]model.Log, error) {
+func (s *Storage) GetLogs(logID int) ([]model.Log, error) {
 	return s.clickhouse.GetLogsFromDB(logID)
 }
 

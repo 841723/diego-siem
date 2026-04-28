@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"strconv"
 
 	"backend/internal/storage"
 
@@ -17,12 +18,14 @@ func NewLogsHandler(storage *storage.Storage) *LogsHandler {
 }
 
 func (h *LogsHandler) GetLogs(c *gin.Context) {
-	logID := c.Param("id")
-	if logID == "" {
-		logID = "1"
+	strSourceID := c.Param("id")
+	sourceID, err := strconv.Atoi(strSourceID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid source ID"})
+		return
 	}
 
-	sources, err := h.storage.GetLogs(logID)
+	sources, err := h.storage.GetLogs(sourceID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -43,7 +46,6 @@ func LogRegisterRoutes(r *gin.Engine, storage *storage.Storage) {
 	handler := NewLogsHandler(storage)
 	logsGroup := r.Group("/logs")
 
-	logsGroup.GET("", handler.GetLogs)
 	logsGroup.GET("/:id", handler.GetLogs)
 
 	logsGroup.DELETE("/all", handler.DeleteLogs)

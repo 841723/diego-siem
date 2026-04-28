@@ -2,7 +2,7 @@ DROP TABLE IF EXISTS logs;
 
 CREATE TABLE logs (
     timestamp DateTime,
-    source_id String,
+    sourceid Int,
     data JSON
 ) ENGINE = MergeTree()
 ORDER BY timestamp;

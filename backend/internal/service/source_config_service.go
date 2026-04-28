@@ -73,22 +73,19 @@ func NewSourceManager(s *storage.Storage) *SourceManager {
 }
 
 func (s *SourceManager) AddSource(cfg model.SourceConfig) {
-	fmt.Printf("Adding source: %+v\n", cfg)
 	if cfg.Port == 0 || cfg.Protocol == "" || cfg.Parser == "" {
 		return
 	}
 
-	if !s.validNewSource(cfg) {
-		return 
+	// if is not in DB, add it
+	if s.validAddToDBSource(cfg) {
+		ID, err := s.storage.AddSource(cfg)
+		if err != nil {
+			fmt.Printf("Error adding source: %v\n", err)
+			return
+		}
+		cfg.ID = ID
 	}
-
-
-	ID, err := s.storage.AddSource(cfg)
-	if err != nil {
-		fmt.Printf("Error adding source: %v\n", err)
-		return
-	}
-	cfg.ID = ID
 
 	max_items_channels := 100
 	parsed_ch := make(chan model.Log, max_items_channels)
@@ -97,14 +94,14 @@ func (s *SourceManager) AddSource(cfg model.SourceConfig) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.sources[string(ID)] = &SourceConfigRuntime{
+	s.sources[string(cfg.ID)] = &SourceConfigRuntime{
 		Config:    cfg,
 		ParsedCh:  parsed_ch,
 		StorageCh: storage_ch,
 		StopChan:  stop_ch,
 	}
 
-	s.StartSource(ID)
+	s.StartSource(cfg.ID)
 }
 
 func (s *SourceManager) GetSources() []model.SourceConfig {
@@ -150,12 +147,11 @@ func (s *SourceManager) StopSource(id int) {
 	// delete(s.sources, id)
 }
 
-
-func (s *SourceManager) validNewSource(cfg model.SourceConfig) bool {
+func (s *SourceManager) validAddToDBSource(cfg model.SourceConfig) bool {
 	if cfg.Port == 0 || cfg.Protocol == "" || cfg.Parser == "" {
 		return false
 	}
-	
+
 	sources := s.GetSources()
 	for _, src := range sources {
 		if src.Port == cfg.Port && src.Protocol == cfg.Protocol {
