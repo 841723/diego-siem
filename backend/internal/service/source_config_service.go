@@ -1,6 +1,8 @@
 package service
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 
 	"backend/internal/model"
@@ -24,11 +26,11 @@ type SourceConfigRuntime struct {
 	StopChan chan struct{}
 }
 
-func (src *SourceConfigRuntime) waitAndProcessLogs() {
+func (src *SourceConfigRuntime) waitAndProcessLogs(s *storage.Storage) {
 	for {
 		select {
 		case log := <-src.ParsedCh:
-			log, err := pipelines.ProcessLog(log, src.Config.Pipeline)
+			log, err := pipelines.ProcessLog(log, src.Config.PipelineID)
 			if err != nil {
 				// Handle error
 				continue
@@ -40,11 +42,11 @@ func (src *SourceConfigRuntime) waitAndProcessLogs() {
 	}
 }
 
-func (src *SourceConfigRuntime) waitAndStoreLogs() {
+func (src *SourceConfigRuntime) waitAndStoreLogs(s *storage.Storage) {
 	for {
 		select {
 		case log := <-src.StorageCh:
-			storage.StoreLog(log)
+			s.StoreLog(log)
 		case <-src.StopChan:
 			return
 		}
@@ -53,24 +55,36 @@ func (src *SourceConfigRuntime) waitAndStoreLogs() {
 
 type SourceManager struct {
 	sources map[string]*SourceConfigRuntime
+	storage *storage.Storage
 	mu      sync.Mutex
 }
 
-func NewSourceManager() *SourceManager {
-	return &SourceManager{
+func NewSourceManager(s *storage.Storage) *SourceManager {
+	sm := &SourceManager{
 		sources: make(map[string]*SourceConfigRuntime),
+		storage: s,
 	}
+	// Load existing sources from storage
+	existingSources := sm.GetSources()
+	for _, src := range existingSources {
+		sm.AddSource(src)
+	}
+	return sm
 }
 
 func (s *SourceManager) AddSource(cfg model.SourceConfig) {
-	if cfg.ID == "" || cfg.Port == 0 || cfg.Protocol == "" || cfg.Parser == "" {
+	if cfg.Port == 0 || cfg.Protocol == "" || cfg.Parser == "" {
 		return
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.sources[cfg.ID] != nil {
-		return
+	// if is not in DB, add it
+	if s.validAddToDBSource(cfg) {
+		ID, err := s.storage.AddSource(cfg)
+		if err != nil {
+			fmt.Printf("Error adding source: %v\n", err)
+			return
+		}
+		cfg.ID = ID
 	}
 
 	max_items_channels := 100
@@ -78,7 +92,9 @@ func (s *SourceManager) AddSource(cfg model.SourceConfig) {
 	storage_ch := make(chan model.Log, max_items_channels)
 	stop_ch := make(chan struct{})
 
-	s.sources[cfg.ID] = &SourceConfigRuntime{
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sources[string(cfg.ID)] = &SourceConfigRuntime{
 		Config:    cfg,
 		ParsedCh:  parsed_ch,
 		StorageCh: storage_ch,
@@ -89,24 +105,22 @@ func (s *SourceManager) AddSource(cfg model.SourceConfig) {
 }
 
 func (s *SourceManager) GetSources() []model.SourceConfig {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	var sources []model.SourceConfig
-	for _, src := range s.sources {
-		sources = append(sources, src.Config)
+	sources, err := s.storage.GetSources()
+	if err != nil {
+		// Handle error
+		return nil
 	}
 	return sources
 }
 
-func (s *SourceManager) ClearSources() {
+func (s *SourceManager) ClearSources() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.sources = make(map[string]*SourceConfigRuntime)
+	return errors.New("not implemented")
 }
 
-func (s *SourceManager) StartSource(id string) {
-	src := s.sources[id]
+func (s *SourceManager) StartSource(id int) {
+	src := s.sources[string(id)]
 	if src == nil {
 		return
 	}
@@ -116,19 +130,34 @@ func (s *SourceManager) StartSource(id string) {
 		source.StartSyslogServer(src.Config, src.ParsedCh)
 	}
 
-	go src.waitAndProcessLogs()
-	go src.waitAndStoreLogs()
+	go src.waitAndProcessLogs(s.storage)
+	go src.waitAndStoreLogs(s.storage)
 }
 
-func (s *SourceManager) StopSource(id string) {
+func (s *SourceManager) StopSource(id int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	src := s.sources[id]
+	src := s.sources[string(id)]
 	if src == nil {
 		return
 	}
 
 	close(src.StopChan)
-	delete(s.sources, id)
+	// delete(s.sources, id)
+}
+
+func (s *SourceManager) validAddToDBSource(cfg model.SourceConfig) bool {
+	if cfg.Port == 0 || cfg.Protocol == "" || cfg.Parser == "" {
+		return false
+	}
+
+	sources := s.GetSources()
+	for _, src := range sources {
+		if src.Port == cfg.Port && src.Protocol == cfg.Protocol {
+			return false
+		}
+	}
+
+	return true
 }

@@ -7,6 +7,7 @@ import (
 	"backend/internal/model"
 	"backend/internal/routes"
 	"backend/internal/service"
+	"backend/internal/storage"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -14,7 +15,8 @@ import (
 
 type App struct {
 	// Array with all sources in memory
-	sources service.SourceManager
+	sources  service.SourceManager
+	storages storage.Storage
 }
 
 func (a *App) initAPI() {
@@ -33,28 +35,30 @@ func (a *App) initAPI() {
 	}))
 
 	// 	/logs
-	routes.LogRegisterRoutes(r)
+	routes.LogRegisterRoutes(r, &a.storages)
 
 	// 	/sources
-	routes.SourcesRegisterRoutes(r, &a.sources)
+	routes.SourcesRegisterRoutes(r, &a.sources, &a.storages)
 
 	r.Run(":8080")
 }
 
 func (a *App) initSources() {
 	initialSource := model.SourceConfig{
-		ID:       "1",
-		Protocol: "udp",
-		Port:     9001,
-		Parser:   "syslog",
-		Name:     "My Syslog Source",
+		Protocol:   "udp",
+		Port:       9001,
+		Parser:     "syslog",
+		Name:       "My Syslog Source",
+		PipelineID: 1,
 	}
 	a.sources.AddSource(initialSource)
 }
 
 func New() *App {
+	storages := storage.NewStorage()
 	return &App{
-		sources: *service.NewSourceManager(),
+		storages: *storages,
+		sources:  *service.NewSourceManager(storages),
 	}
 }
 

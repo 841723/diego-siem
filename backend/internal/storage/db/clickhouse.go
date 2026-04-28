@@ -76,7 +76,7 @@ func (db *ClickHouseDB) LogToDB(log model.Log) error {
 	}
 
 	ctx := context.Background()
-	err := db.conn.Exec(ctx, "INSERT INTO logs (timestamp, source_id, data) VALUES (?, ?, ?)",
+	err := db.conn.Exec(ctx, "INSERT INTO logs (timestamp, sourceid, data) VALUES (?, ?, ?)",
 		log.Timestamp, log.SourceID, data)
 	if err != nil {
 		return fmt.Errorf("failed to insert log: %w", err)
@@ -84,9 +84,9 @@ func (db *ClickHouseDB) LogToDB(log model.Log) error {
 	return nil
 }
 
-func (db *ClickHouseDB) GetLogsFromDB() ([]model.Log, error) {
+func (db *ClickHouseDB) GetLogsFromDB(logID int) ([]model.Log, error) {
 	ctx := context.Background()
-	rows, err := db.conn.Query(ctx, "SELECT timestamp, source_id, data FROM logs ORDER BY timestamp DESC LIMIT 100")
+	rows, err := db.conn.Query(ctx, "SELECT timestamp, sourceid, data FROM logs WHERE sourceid = ? ORDER BY timestamp DESC LIMIT 100", logID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logs: %w", err)
 	}
@@ -95,11 +95,13 @@ func (db *ClickHouseDB) GetLogsFromDB() ([]model.Log, error) {
 	var logs []model.Log
 	for rows.Next() {
 		var log model.Log
+		var sourceID int32
 
 		var data map[string]interface{}
-		if err := rows.Scan(&log.Timestamp, &log.SourceID, &data); err != nil {
+		if err := rows.Scan(&log.Timestamp, &sourceID, &data); err != nil {
 			return nil, fmt.Errorf("failed to scan log row: %w", err)
 		}
+		log.SourceID = int(sourceID)
 		log.Data = data
 
 		logs = append(logs, log)
@@ -110,4 +112,13 @@ func (db *ClickHouseDB) GetLogsFromDB() ([]model.Log, error) {
 	}
 
 	return logs, nil
+}
+
+func (db *ClickHouseDB) DeleteLogsFromDB() error {
+	ctx := context.Background()
+	err := db.conn.Exec(ctx, "TRUNCATE TABLE logs")
+	if err != nil {
+		return fmt.Errorf("failed to delete logs: %w", err)
+	}
+	return nil
 }

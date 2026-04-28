@@ -163,11 +163,10 @@ function App() {
 
         async function fetchLogs() {
             try {
-                const response = await fetch(`${API_BASE}/logs`);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-                const payload = await response.json();
-                const nextLogs = normalizeLogs(payload);
+                const res = await fetch("http://localhost:8080/logs/1");
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
 
                 if (!cancelled) {
                     setLogs(nextLogs);

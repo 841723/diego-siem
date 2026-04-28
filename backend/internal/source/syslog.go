@@ -40,7 +40,7 @@ func (s *SyslogServer) Start() {
 		raw := string(buf[:n])
 		// fmt.Printf("Received raw syslog message: %s\n", raw)
 		go func() {
-			parsedLog, err := parseSyslog(raw, s.cfg.Name)
+			parsedLog, err := parseSyslog(raw, s.cfg.ID)
 			if err != nil {
 				log.Printf("Error parsing syslog message: %v\n", err)
 				return
@@ -63,7 +63,7 @@ func StartSyslogServer(cfg model.SourceConfig, outChannel chan<- model.Log) {
 	go syslogServer.Start()
 }
 
-func parseSyslog(raw string, source string) (*model.Log, error) {
+func parseSyslog(raw string, source int) (*model.Log, error) {
 	p := rfc5424.NewParser(rfc5424.WithBestEffort())
 
 	m, err := p.Parse([]byte(raw))
