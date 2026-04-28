@@ -5,7 +5,7 @@ import type { SourceConfig } from "../types";
 import LoadingState from "../components/LoadingState";
 import EmptyState from "../components/EmptyState";
 
-function sourceIdFromName(name: string): string {
+function nameToSlug(name: string): string {
     return name
         .trim()
         .toLowerCase()
@@ -61,7 +61,7 @@ export default function SourcesPage() {
         }
     }
 
-    const idPreview = sourceIdFromName(name);
+    const slugPreview = nameToSlug(name);
 
     return (
         <div className="space-y-6">
@@ -88,9 +88,9 @@ export default function SourcesPage() {
                                 placeholder="ej. firewall-norte"
                                 required
                             />
-                            {idPreview && (
+                            {slugPreview && (
                                 <p className="text-xs text-slate-500">
-                                    Slug: <span className="text-slate-400">{idPreview}</span>
+                                    Slug: <span className="text-slate-400">{slugPreview}</span>
                                 </p>
                             )}
                         </div>

@@ -50,7 +50,6 @@ export type LogFiltersState = {
     toggleColumn: (col: string) => void;
     setPage: (p: number) => void;
     setPageSize: (s: number) => void;
-    logs: LogEntry[];
     filteredLogs: LogEntry[];
     paginatedLogs: LogEntry[];
     availableColumns: string[];
@@ -221,7 +220,6 @@ export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
         toggleColumn,
         setPage,
         setPageSize,
-        logs,
         filteredLogs,
         paginatedLogs,
         availableColumns,
