@@ -52,6 +52,24 @@ func (a *App) initSources() {
 		PipelineID: 1,
 	}
 	a.sources.AddSource(initialSource)
+
+	initialSource2 := model.SourceConfig{
+		Protocol:   "udp",
+		Port:       9002,
+		Parser:     "syslog",
+		Name:       "My Syslog Source 2",
+		PipelineID: 1,
+	}
+	a.sources.AddSource(initialSource2)
+
+	initialSource3 := model.SourceConfig{
+		Protocol:   "udp",
+		Port:       9003,
+		Parser:     "syslog",
+		Name:       "My Syslog Source 3",
+		PipelineID: 1,
+	}
+	a.sources.AddSource(initialSource3)
 }
 
 func New() *App {

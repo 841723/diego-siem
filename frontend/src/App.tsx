@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 type LogEntry = {
     _row_key: string;
     timestamp: number;
-    source_id: string;
+    sourceid: string;
     data: Record<string, unknown>;
 };
 
@@ -13,8 +13,7 @@ type SourceConfig = {
     port: number;
     protocol: "udp";
     parser: "syslog";
-    pipeline_id: string;
-    index_id: string;
+    pipelineid: string;
 };
 
 type MappingDef = {
@@ -35,14 +34,15 @@ type RuleDef = {
 };
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
-const DEFAULT_COLUMNS = ["timestamp", "source_id"];
+const PAGE_SIZE_OPTIONS = [1, 10, 25, 50, 100];
+const DEFAULT_COLUMNS = ["timestamp", "sourceid"];
 const TIMESTAMP_MS_THRESHOLD = 1_000_000_000_000;
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
 const TIME_WINDOWS: Array<{ label: string; value: string; ms: number | null }> = [
+    { label: "Último minuto", value: "1m", ms: 1 * MINUTE_MS },
     { label: "Últimos 15 minutos", value: "15m", ms: 15 * MINUTE_MS },
     { label: "Última hora", value: "1h", ms: HOUR_MS },
     { label: "Últimas 6 horas", value: "6h", ms: 6 * HOUR_MS },
@@ -95,7 +95,7 @@ function normalizeLogs(payload: unknown): LogEntry[] {
 
     const duplicatedKeys = new Map<string, number>();
     return rawLogs.map((log) => {
-        const signature = `${log.source_id}-${log.timestamp}-${JSON.stringify(log.data ?? {})}`;
+        const signature = `${log.sourceid}-${log.timestamp}-${JSON.stringify(log.data ?? {})}`;
         const count = (duplicatedKeys.get(signature) ?? 0) + 1;
         duplicatedKeys.set(signature, count);
 
@@ -108,6 +108,7 @@ function normalizeLogs(payload: unknown): LogEntry[] {
 
 async function postJson(path: string, body: object): Promise<{ ok: boolean; message: string }> {
     try {
+        console.log(`POST ${API_BASE}${path}`, body);
         const response = await fetch(`${API_BASE}${path}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -124,6 +125,28 @@ async function postJson(path: string, body: object): Promise<{ ok: boolean; mess
     }
 }
 
+async function fetchLogs(selectedSources: string, setLogs: (logs: LogEntry[]) => void, setLogsError: (error: string) => void, cancelled: boolean) {
+    try {
+        console.log("Fetching logs for source:", selectedSources);
+        const response = await fetch(
+            `${API_BASE}/logs/${selectedSources || "1"}`,
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const payload = await response.json();
+        const nextLogs = normalizeLogs(payload);
+
+        if (!cancelled) {
+            setLogs(nextLogs);
+            setLogsError("");
+        }
+    } catch (err) {
+        if (!cancelled) {
+            setLogsError((err as Error).message || "Error cargando logs");
+        }
+    }
+}
+
 function App() {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [sources, setSources] = useState<SourceConfig[]>([]);
@@ -132,7 +155,7 @@ function App() {
     const [rules, setRules] = useState<RuleDef[]>([]);
 
     const [logsError, setLogsError] = useState("");
-    const [selectedSources, setSelectedSources] = useState<string[]>([]);
+    const [selectedSources, setSelectedSources] = useState<string>(sources.length > 0 ? sources[0].id : "");
     const [sourceSelectionTouched, setSourceSelectionTouched] = useState(false);
     const [selectedColumns, setSelectedColumns] = useState<string[]>(DEFAULT_COLUMNS);
     const [selectedTimeWindow, setSelectedTimeWindow] = useState("1h");
@@ -161,34 +184,7 @@ function App() {
     useEffect(() => {
         let cancelled = false;
 
-        async function fetchLogs() {
-            try {
-                const response = await fetch(`${API_BASE}/logs`);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-                const payload = await response.json();
-                const nextLogs = normalizeLogs(payload);
-
-                if (!cancelled) {
-                    setLogs(nextLogs);
-                    setLogsError("");
-                }
-            } catch (err) {
-                if (!cancelled) {
-                    setLogsError(
-                        (err as Error).message || "Error cargando logs",
-                    );
-                }
-            }
-        }
-
-        fetchLogs();
-        const intervalId = setInterval(fetchLogs, 2000);
-
-        return () => {
-            cancelled = true;
-            clearInterval(intervalId);
-        };
+        fetchLogs(selectedSources[0] || "1", setLogs, setLogsError, cancelled);
     }, []);
 
     useEffect(() => {
@@ -222,29 +218,21 @@ function App() {
     const sourceIds = useMemo(() => {
         const ids = new Set<string>();
         sources.forEach((source) => ids.add(source.id));
-        logs.forEach((log) => ids.add(log.source_id));
+        logs.forEach((log) => ids.add(log.sourceid));
         return Array.from(ids).sort();
     }, [logs, sources]);
 
     useEffect(() => {
             if (sourceIds.length === 0) {
-                setSelectedSources([]);
+                setSelectedSources("");
                 return;
             }
-
-            setSelectedSources((prev) => {
-                const valid = prev.filter((sourceId) => sourceIds.includes(sourceId));
-
-                if (!sourceSelectionTouched && (prev.length === 0 || valid.length === 0)) {
-                    return sourceIds;
-                }
-
-                return valid;
-            });
+            
+            setSelectedSources(sourceIds[0]);
     }, [sourceIds, sourceSelectionTouched]);
 
     const availableColumns = useMemo(() => {
-        const set = new Set<string>(["timestamp", "source_id"]);
+        const set = new Set<string>(["timestamp", "sourceid"]);
 
         mappings.forEach((mapping) => {
             mapping.fields.forEach((field) => set.add(field));
@@ -272,7 +260,7 @@ function App() {
         return logs.filter((log) => {
             if (sourceIds.length > 0) {
                 if (selectedSources.length === 0) return false;
-                if (!selectedSources.includes(log.source_id)) return false;
+                if (selectedSources !== log.sourceid) return false;
             }
 
             if (selectedWindow.ms !== null) {
@@ -285,7 +273,7 @@ function App() {
             const needle = filterText.trim().toLowerCase();
             return selectedColumns.some((column) => {
                 if (column === "timestamp") return formatTimestamp(log.timestamp).toLowerCase().includes(needle);
-                if (column === "source_id") return log.source_id.toLowerCase().includes(needle);
+                if (column === "sourceid") return log.sourceid.toLowerCase().includes(needle);
                 return formatCellValue(log.data?.[column]).toLowerCase().includes(needle);
             });
         });
@@ -305,9 +293,7 @@ function App() {
     function toggleSource(sourceId: string) {
         setCurrentPage(1);
         setSourceSelectionTouched(true);
-        setSelectedSources((prev) =>
-            prev.includes(sourceId) ? prev.filter((item) => item !== sourceId) : [...prev, sourceId],
-        );
+        setSelectedSources(selectedSources === sourceId ? "" : sourceId);
     }
 
     function toggleColumn(column: string) {
@@ -328,8 +314,7 @@ function App() {
             port: sourcePort,
             protocol: "udp",
             parser: "syslog",
-            pipeline_id: sourcePipelineId,
-            index_id: sourceMappingId,
+            pipelineid: sourcePipelineId,
         };
 
         const apiResult = await postJson("/sources", source);
@@ -425,25 +410,45 @@ function App() {
         <main className='min-h-screen bg-slate-950 text-slate-100'>
             <div className='mx-auto max-w-7xl space-y-6 p-6'>
                 <header className='rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg'>
-                    <h1 className='text-2xl font-bold md:text-3xl'>dieGo SIEM · Frontend</h1>
+                    <h1 className='text-2xl font-bold md:text-3xl'>
+                        dieGo SIEM · Frontend
+                    </h1>
                     <p className='mt-2 text-sm text-slate-300'>
-                        Consulta de logs con filtros avanzados y administración de fuentes, mappings, pipelines y reglas.
+                        Consulta de logs con filtros avanzados y administración
+                        de fuentes, mappings, pipelines y reglas.
                     </p>
-                    {message && <p className='mt-3 rounded bg-emerald-900/40 p-2 text-sm text-emerald-200'>{message}</p>}
-                    {logsError && <p className='mt-3 rounded bg-rose-900/40 p-2 text-sm text-rose-200'>{logsError}</p>}
+                    {message && (
+                        <p className='mt-3 rounded bg-emerald-900/40 p-2 text-sm text-emerald-200'>
+                            {message}
+                        </p>
+                    )}
+                    {logsError && (
+                        <p className='mt-3 rounded bg-rose-900/40 p-2 text-sm text-rose-200'>
+                            {logsError}
+                        </p>
+                    )}
                 </header>
 
                 <section className='grid gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:grid-cols-3'>
                     <article className='space-y-3'>
-                        <h2 className='text-lg font-semibold'>Fuentes ({selectedSources.length})</h2>
+                        <h2 className='text-lg font-semibold'>
+                            Fuentes ({selectedSources || "Sin selección"})
+                        </h2>
                         <div className='max-h-44 space-y-2 overflow-auto rounded border border-slate-800 p-2'>
-                            {sourceIds.length === 0 && <p className='text-sm text-slate-400'>Sin fuentes detectadas</p>}
+                            {sourceIds.length === 0 && (
+                                <p className='text-sm text-slate-400'>
+                                    Sin fuentes detectadas
+                                </p>
+                            )}
                             {sourceIds.map((sourceId) => (
-                                <label key={sourceId} className='flex items-center gap-2 text-sm'>
+                                <label
+                                    key={sourceId}
+                                    className='flex items-center gap-2 text-sm'
+                                >
                                     <input
                                         type='checkbox'
                                         className='accent-cyan-400'
-                                        checked={selectedSources.includes(sourceId)}
+                                        checked={selectedSources === sourceId}
                                         onChange={() => toggleSource(sourceId)}
                                     />
                                     {sourceId}
@@ -453,14 +458,21 @@ function App() {
                     </article>
 
                     <article className='space-y-3'>
-                        <h2 className='text-lg font-semibold'>Columnas visibles</h2>
+                        <h2 className='text-lg font-semibold'>
+                            Columnas visibles
+                        </h2>
                         <div className='max-h-44 space-y-2 overflow-auto rounded border border-slate-800 p-2'>
                             {availableColumns.map((column) => (
-                                <label key={column} className='flex items-center gap-2 text-sm'>
+                                <label
+                                    key={column}
+                                    className='flex items-center gap-2 text-sm'
+                                >
                                     <input
                                         type='checkbox'
                                         className='accent-cyan-400'
-                                        checked={selectedColumns.includes(column)}
+                                        checked={selectedColumns.includes(
+                                            column,
+                                        )}
                                         onChange={() => toggleColumn(column)}
                                     />
                                     {column}
@@ -470,7 +482,9 @@ function App() {
                     </article>
 
                     <article className='space-y-3'>
-                        <h2 className='text-lg font-semibold'>Ventana temporal y filtro</h2>
+                        <h2 className='text-lg font-semibold'>
+                            Ventana temporal y filtro
+                        </h2>
                         <label className='block text-sm text-slate-300'>
                             Ventana temporal
                             <select
@@ -482,7 +496,10 @@ function App() {
                                 }}
                             >
                                 {TIME_WINDOWS.map((window) => (
-                                    <option key={window.value} value={window.value}>
+                                    <option
+                                        key={window.value}
+                                        value={window.value}
+                                    >
                                         {window.label}
                                     </option>
                                 ))}
@@ -501,13 +518,33 @@ function App() {
                             />
                         </label>
                     </article>
+                    <button
+                        className='self-end rounded bg-cyan-600 px-4 py-2 font-semibold hover:bg-cyan-500 md:col-span-3'
+                        onClick={() =>
+                            fetchLogs(
+                                selectedSources,
+                                setLogs,
+                                setLogsError,
+                                false,
+                            )
+                        }
+                    >
+                        Buscar
+                    </button>
                 </section>
 
                 <section className='rounded-2xl border border-slate-800 bg-slate-900 p-4'>
                     <div className='mb-3 flex flex-wrap items-center justify-between gap-3 text-sm'>
                         <p>
-                            Mostrando <span className='font-semibold'>{paginatedLogs.length}</span> de{" "}
-                            <span className='font-semibold'>{filteredLogs.length}</span> logs filtrados
+                            Mostrando{" "}
+                            <span className='font-semibold'>
+                                {paginatedLogs.length}
+                            </span>{" "}
+                            de{" "}
+                            <span className='font-semibold'>
+                                {filteredLogs.length}
+                            </span>{" "}
+                            logs filtrados
                         </p>
                         <label className='flex items-center gap-2'>
                             Tamaño de página
@@ -533,7 +570,10 @@ function App() {
                             <thead className='bg-slate-800'>
                                 <tr>
                                     {selectedColumns.map((column) => (
-                                        <th key={column} className='border-b border-slate-700 p-2 text-left font-semibold'>
+                                        <th
+                                            key={column}
+                                            className='border-b border-slate-700 p-2 text-left font-semibold'
+                                        >
                                             {column}
                                         </th>
                                     ))}
@@ -541,14 +581,24 @@ function App() {
                             </thead>
                             <tbody>
                                 {paginatedLogs.map((log) => (
-                                    <tr key={log._row_key} className='odd:bg-slate-900 even:bg-slate-950'>
+                                    <tr
+                                        key={log._row_key}
+                                        className='odd:bg-slate-900 even:bg-slate-950'
+                                    >
                                         {selectedColumns.map((column) => (
-                                            <td key={column} className='border-b border-slate-800 p-2 align-top'>
+                                            <td
+                                                key={column}
+                                                className='border-b border-slate-800 p-2 align-top'
+                                            >
                                                 {column === "timestamp"
-                                                    ? formatTimestamp(log.timestamp)
-                                                    : column === "source_id"
-                                                      ? log.source_id
-                                                      : formatCellValue(log.data?.[column])}
+                                                    ? formatTimestamp(
+                                                          log.timestamp,
+                                                      )
+                                                    : column === "sourceid"
+                                                      ? log.sourceid
+                                                      : formatCellValue(
+                                                            log.data?.[column],
+                                                        )}
                                             </td>
                                         ))}
                                     </tr>
@@ -556,10 +606,14 @@ function App() {
                                 {paginatedLogs.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan={Math.max(1, selectedColumns.length)}
+                                            colSpan={Math.max(
+                                                1,
+                                                selectedColumns.length,
+                                            )}
                                             className='p-4 text-center text-slate-400'
                                         >
-                                            No hay logs para los criterios seleccionados
+                                            No hay logs para los criterios
+                                            seleccionados
                                         </td>
                                     </tr>
                                 )}
@@ -571,7 +625,9 @@ function App() {
                         <button
                             className='rounded border border-slate-700 px-3 py-1 disabled:opacity-40'
                             disabled={currentPage <= 1}
-                            onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                            onClick={() =>
+                                setCurrentPage((page) => Math.max(1, page - 1))
+                            }
                         >
                             Anterior
                         </button>
@@ -581,14 +637,18 @@ function App() {
                         <button
                             className='rounded border border-slate-700 px-3 py-1 disabled:opacity-40'
                             disabled={currentPage >= totalPages}
-                            onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                            onClick={() =>
+                                setCurrentPage((page) =>
+                                    Math.min(totalPages, page + 1),
+                                )
+                            }
                         >
                             Siguiente
                         </button>
                     </div>
                 </section>
 
-                <section className='grid gap-4 md:grid-cols-2'>
+                {/* <section className='grid gap-4 md:grid-cols-2'>
                     <form
                         className='space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-4'
                         onSubmit={handleCreateSource}
@@ -697,7 +757,7 @@ function App() {
                         />
                         <textarea
                             className='h-24 w-full rounded border border-slate-700 bg-slate-950 p-2'
-                            placeholder='Consulta. Ej: severity:error AND source_id:web-syslog'
+                            placeholder='Consulta. Ej: severity:error AND sourceid:web-syslog'
                             value={ruleQuery}
                             onChange={(event) => setRuleQuery(event.target.value)}
                             required
@@ -725,12 +785,15 @@ function App() {
                             Crear regla
                         </button>
                     </form>
-                </section>
+                </section> */}
 
                 <section className='rounded-2xl border border-slate-800 bg-slate-900 p-4'>
-                    <h2 className='mb-2 text-lg font-semibold'>Resumen de configuración local</h2>
+                    <h2 className='mb-2 text-lg font-semibold'>
+                        Resumen de configuración local
+                    </h2>
                     <p className='text-sm text-slate-300'>
-                        Fuentes: {sources.length} · Mappings: {mappings.length} · Pipelines: {pipelines.length} · Reglas: {rules.length}
+                        Fuentes: {sources.length} · Mappings: {mappings.length}{" "}
+                        · Pipelines: {pipelines.length} · Reglas: {rules.length}
                     </p>
                 </section>
             </div>

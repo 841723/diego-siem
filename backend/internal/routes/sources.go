@@ -11,7 +11,7 @@ import (
 )
 
 type SourceHandler struct {
-	svc *service.SourceManager
+	svc     *service.SourceManager
 	storage *storage.Storage
 }
 
@@ -46,7 +46,7 @@ func SourcesRegisterRoutes(r *gin.Engine, svc *service.SourceManager, storage *s
 	handler := NewSourceHandler(svc, storage)
 	sourcesGroup := r.Group("/sources")
 
-	sourcesGroup.POST("/", handler.AddSource)
-	sourcesGroup.GET("/", handler.GetSources)
-	sourcesGroup.DELETE("/", handler.ClearSources)
+	sourcesGroup.POST("", handler.AddSource)
+	sourcesGroup.GET("", handler.GetSources)
+	sourcesGroup.DELETE("", handler.ClearSources)
 }
