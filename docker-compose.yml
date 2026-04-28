@@ -9,8 +9,14 @@ services:
     environment:
       - CLICKHOUSE_HOST=clickhouse
       - CLICKHOUSE_PORT=9000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=siem
+      - POSTGRES_PASSWORD=siem
+      - POSTGRES_DB=siem
     depends_on:
       - clickhouse
+      - postgres
     working_dir: /app
     command: air
 
@@ -55,7 +61,23 @@ services:
       - clickhouse_data:/var/lib/clickhouse
       - clickhouse_logs:/var/log/clickhouse-server
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
+      
+  postgres:
+    image: postgres:15
+    container_name: siem-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: siem
+      POSTGRES_PASSWORD: siem
+      POSTGRES_DB: siem
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
 
 volumes:
   clickhouse_data:
   clickhouse_logs:
+  postgres_data:

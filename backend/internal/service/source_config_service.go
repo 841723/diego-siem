@@ -1,6 +1,8 @@
 package service
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 
 	"backend/internal/model"
@@ -28,7 +30,7 @@ func (src *SourceConfigRuntime) waitAndProcessLogs(s *storage.Storage) {
 	for {
 		select {
 		case log := <-src.ParsedCh:
-			log, err := pipelines.ProcessLog(log, src.Config.Pipeline)
+			log, err := pipelines.ProcessLog(log, src.Config.PipelineID)
 			if err != nil {
 				// Handle error
 				continue
@@ -58,57 +60,70 @@ type SourceManager struct {
 }
 
 func NewSourceManager(s *storage.Storage) *SourceManager {
-	return &SourceManager{
+	sm := &SourceManager{
 		sources: make(map[string]*SourceConfigRuntime),
 		storage: s,
 	}
+	// Load existing sources from storage
+	existingSources := sm.GetSources()
+	for _, src := range existingSources {
+		sm.AddSource(src)
+	}
+	return sm
 }
 
 func (s *SourceManager) AddSource(cfg model.SourceConfig) {
-	if cfg.ID == "" || cfg.Port == 0 || cfg.Protocol == "" || cfg.Parser == "" {
+	fmt.Printf("Adding source: %+v\n", cfg)
+	if cfg.Port == 0 || cfg.Protocol == "" || cfg.Parser == "" {
 		return
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.sources[cfg.ID] != nil {
+	if !s.validNewSource(cfg) {
+		return 
+	}
+
+
+	ID, err := s.storage.AddSource(cfg)
+	if err != nil {
+		fmt.Printf("Error adding source: %v\n", err)
 		return
 	}
+	cfg.ID = ID
 
 	max_items_channels := 100
 	parsed_ch := make(chan model.Log, max_items_channels)
 	storage_ch := make(chan model.Log, max_items_channels)
 	stop_ch := make(chan struct{})
 
-	s.sources[cfg.ID] = &SourceConfigRuntime{
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sources[string(ID)] = &SourceConfigRuntime{
 		Config:    cfg,
 		ParsedCh:  parsed_ch,
 		StorageCh: storage_ch,
 		StopChan:  stop_ch,
 	}
 
-	s.StartSource(cfg.ID)
+	s.StartSource(ID)
 }
 
 func (s *SourceManager) GetSources() []model.SourceConfig {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	var sources []model.SourceConfig
-	for _, src := range s.sources {
-		sources = append(sources, src.Config)
+	sources, err := s.storage.GetSources()
+	if err != nil {
+		// Handle error
+		return nil
 	}
 	return sources
 }
 
-func (s *SourceManager) ClearSources() {
+func (s *SourceManager) ClearSources() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.sources = make(map[string]*SourceConfigRuntime)
+	return errors.New("not implemented")
 }
 
-func (s *SourceManager) StartSource(id string) {
-	src := s.sources[id]
+func (s *SourceManager) StartSource(id int) {
+	src := s.sources[string(id)]
 	if src == nil {
 		return
 	}
@@ -122,15 +137,31 @@ func (s *SourceManager) StartSource(id string) {
 	go src.waitAndStoreLogs(s.storage)
 }
 
-func (s *SourceManager) StopSource(id string) {
+func (s *SourceManager) StopSource(id int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	src := s.sources[id]
+	src := s.sources[string(id)]
 	if src == nil {
 		return
 	}
 
 	close(src.StopChan)
-	delete(s.sources, id)
+	// delete(s.sources, id)
+}
+
+
+func (s *SourceManager) validNewSource(cfg model.SourceConfig) bool {
+	if cfg.Port == 0 || cfg.Protocol == "" || cfg.Parser == "" {
+		return false
+	}
+	
+	sources := s.GetSources()
+	for _, src := range sources {
+		if src.Port == cfg.Port && src.Protocol == cfg.Protocol {
+			return false
+		}
+	}
+
+	return true
 }

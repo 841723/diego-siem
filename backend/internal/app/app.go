@@ -45,11 +45,11 @@ func (a *App) initAPI() {
 
 func (a *App) initSources() {
 	initialSource := model.SourceConfig{
-		ID:       "1",
-		Protocol: "udp",
-		Port:     9001,
-		Parser:   "syslog",
-		Name:     "My Syslog Source",
+		Protocol:   "udp",
+		Port:       9001,
+		Parser:     "syslog",
+		Name:       "My Syslog Source",
+		PipelineID: 1,
 	}
 	a.sources.AddSource(initialSource)
 }
@@ -58,7 +58,7 @@ func New() *App {
 	storages := storage.NewStorage()
 	return &App{
 		storages: *storages,
-		sources: *service.NewSourceManager(storages),
+		sources:  *service.NewSourceManager(storages),
 	}
 }
 

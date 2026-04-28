@@ -33,11 +33,11 @@ func (s *Storage) GetSources() ([]model.SourceConfig, error) {
 	return s.postgres.GetSourcesFromDB()
 }
 
-func (s *Storage) AddSource(source model.SourceConfig) error {
+func (s *Storage) AddSource(source model.SourceConfig) (int, error) {
 	return s.postgres.AddSourceToDB(source)
 }
 
-func (s *Storage) DeleteSource(sourceID string) error {
+func (s *Storage) DeleteSource(sourceID int) error {
 	return s.postgres.DeleteSourceFromDB(sourceID)
 }
 
