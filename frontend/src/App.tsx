@@ -163,10 +163,11 @@ function App() {
 
         async function fetchLogs() {
             try {
-                const res = await fetch("http://localhost:8080/logs/1");
-                if (!res.ok) {
-                    throw new Error(`HTTP ${res.status}`);
-                }
+                const response = await fetch(`${API_BASE}/logs`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const payload = await response.json();
+                const nextLogs = normalizeLogs(payload);
 
                 if (!cancelled) {
                     setLogs(nextLogs);
@@ -174,7 +175,9 @@ function App() {
                 }
             } catch (err) {
                 if (!cancelled) {
-                    setLogsError((err as Error).message || "Error cargando logs");
+                    setLogsError(
+                        (err as Error).message || "Error cargando logs",
+                    );
                 }
             }
         }
