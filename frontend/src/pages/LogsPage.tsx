@@ -36,20 +36,12 @@ export default function LogsPage() {
     } = filters;
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">Logs</h1>
-                    <p className="mt-1 text-sm text-slate-400">
-                        Consulta y filtra los eventos recibidos por fuente.
-                    </p>
-                </div>
-                {logsError && (
-                    <p className="rounded bg-rose-900/40 px-3 py-2 text-sm text-rose-200">
-                        {logsError}
-                    </p>
-                )}
-            </div>
+        <>
+            {logsError && (
+                <p className='rounded bg-error/40 px-3 py-2 text-sm text-error'>
+                    {logsError}
+                </p>
+            )}
 
             <FilterBar
                 sources={sources}
@@ -70,10 +62,10 @@ export default function LogsPage() {
             {sourcesLoading || logsLoading ? (
                 <LoadingState />
             ) : sourceId === null ? (
-                <EmptyState message="Selecciona una fuente para ver los logs" />
+                <EmptyState message='Selecciona una fuente para ver los logs' />
             ) : (
                 <>
-                    <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+                    <section className='p-4'>
                         <LogTable logs={paginatedLogs} columns={columns} />
                         <Pagination
                             currentPage={page}
@@ -88,6 +80,6 @@ export default function LogsPage() {
                     </section>
                 </>
             )}
-        </div>
+        </>
     );
 }

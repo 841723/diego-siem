@@ -1,6 +1,9 @@
 package storage
 
 import (
+	"fmt"
+
+	"backend/internal/lib"
 	"backend/internal/model"
 	"backend/internal/storage/db"
 )
@@ -21,8 +24,13 @@ func (s *Storage) StoreLog(log model.Log) error {
 	return s.clickhouse.LogToDB(log)
 }
 
-func (s *Storage) GetLogs(logID int) ([]model.Log, error) {
-	return s.clickhouse.GetLogsFromDB(logID)
+func (s *Storage) GetLogs(params model.GetLogsParams) ([]model.Log, error) {
+	var err error
+	params.TimestampFrom, params.TimestampTo, err = lib.ClickHouse_FormatTimeWindow(params.TimeWindow)
+	if err != nil {
+		return nil, fmt.Errorf("failed to format time window: %w", err)
+	}
+	return s.clickhouse.GetLogsFromDB(params)
 }
 
 func (s *Storage) DeleteLogs() error {

@@ -42,6 +42,16 @@ function normalizeLogs(payload: unknown): LogEntry[] {
 }
 
 export async function getLogs(sourceId: number): Promise<LogEntry[]> {
-    const payload = await request<unknown>(`/logs/${sourceId}`);
+    const payload = await request<unknown>(`/logs/${sourceId}`,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                timeWindow: "now-1m",
+                from: 0,
+                size: 100,
+            }),
+        }
+    );
     return normalizeLogs(payload);
 }

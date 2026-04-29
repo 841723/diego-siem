@@ -84,9 +84,12 @@ func (db *ClickHouseDB) LogToDB(log model.Log) error {
 	return nil
 }
 
-func (db *ClickHouseDB) GetLogsFromDB(logID int) ([]model.Log, error) {
+func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsParams) ([]model.Log, error) {
 	ctx := context.Background()
-	rows, err := db.conn.Query(ctx, "SELECT timestamp, sourceid, data FROM logs WHERE sourceid = ? ORDER BY timestamp DESC LIMIT 100", logID)
+
+	rows, err := db.conn.Query(ctx, "SELECT timestamp, sourceid, data FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?", params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
+
+	fmt.Printf("Executing query: SELECT timestamp, sourceid, data FROM logs WHERE sourceid = %d AND timestamp BETWEEN %s AND %s ORDER BY timestamp DESC LIMIT %d OFFSET %d\n", params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logs: %w", err)
 	}
@@ -110,6 +113,8 @@ func (db *ClickHouseDB) GetLogsFromDB(logID int) ([]model.Log, error) {
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating log rows: %w", err)
 	}
+
+	fmt.Printf("Retrieved %d logs from ClickHouse®\n", len(logs))
 
 	return logs, nil
 }

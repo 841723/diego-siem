@@ -14,3 +14,19 @@ type SourceConfig struct {
 	Name       string `json:"name"`
 	PipelineID int    `json:"pipelineid"` // pipeline to process the log
 }
+
+/*
+**************************************************************
+
+	API Body Arguments
+
+**************************************************************
+*/
+type GetLogsParams struct {
+	TimeWindow    string `json:"timeWindow"`
+	From          int    `json:"from"`
+	Size          int    `json:"size"`
+	SourceID      int
+	TimestampFrom string
+	TimestampTo   string
+}

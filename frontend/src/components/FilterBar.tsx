@@ -39,7 +39,7 @@ export default function FilterBar({
     onSearch,
 }: Props) {
     return (
-        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+        <section className="p-4">
             <div className="grid gap-4 md:grid-cols-4">
                 {/* Source selector */}
                 <SourceSelector
@@ -50,11 +50,11 @@ export default function FilterBar({
 
                 {/* Time window */}
                 <div className="space-y-1">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-text">
                         Ventana temporal
                     </label>
                     <select
-                        className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                        className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:accent-accent"
                         value={timeWindow}
                         onChange={(e) => onTimeWindowChange(e.target.value)}
                     >
@@ -68,11 +68,11 @@ export default function FilterBar({
 
                 {/* Text filter */}
                 <div className="space-y-1">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-text">
                         Buscar
                     </label>
                     <input
-                        className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                        className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text focus:outline-none focus:ring-1 focus:accent-accent"
                         value={filterText}
                         onChange={(e) => onFilterTextChange(e.target.value)}
                         placeholder="IP, user, error, auth…"
@@ -82,11 +82,11 @@ export default function FilterBar({
                 {/* Page size + search button */}
                 <div className="flex flex-col justify-between gap-2">
                     <div className="space-y-1">
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-text">
                             Filas por página
                         </label>
                         <select
-                            className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                            className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:accent-accent"
                             value={pageSize}
                             onChange={(e) => onPageSizeChange(Number(e.target.value))}
                         >
@@ -98,7 +98,7 @@ export default function FilterBar({
                         </select>
                     </div>
                     <button
-                        className="rounded bg-cyan-600 px-4 py-2 text-sm font-semibold hover:bg-cyan-500 active:bg-cyan-700"
+                        className="rounded bg-accent px-4 py-2 text-sm font-semibold hover:bg-accent/80 active:bg-accent/90 text-white"
                         onClick={onSearch}
                     >
                         Buscar
@@ -108,19 +108,19 @@ export default function FilterBar({
 
             {/* Column selector */}
             {availableColumns.length > 0 && (
-                <div className="mt-4 border-t border-slate-800 pt-4">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <div className="mt-4 border-t border-border pt-4">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-text">
                         Columnas visibles
                     </p>
                     <div className="flex flex-wrap gap-2">
                         {availableColumns.map((col) => (
                             <label
                                 key={col}
-                                className="flex cursor-pointer items-center gap-1.5 rounded bg-slate-800 px-2 py-1 text-xs"
+                                className="flex cursor-pointer items-center gap-1.5 rounded bg-surface px-2 py-1 text-xs"
                             >
                                 <input
                                     type="checkbox"
-                                    className="accent-cyan-400"
+                                    className="accent-accent"
                                     checked={selectedColumns.includes(col)}
                                     onChange={() => onToggleColumn(col)}
                                 />

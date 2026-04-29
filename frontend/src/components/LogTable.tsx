@@ -13,14 +13,14 @@ export default function LogTable({ logs, columns }: Props) {
     }
 
     return (
-        <div className="overflow-auto rounded border border-slate-800">
-            <table className="min-w-full border-collapse text-sm">
-                <thead className="bg-slate-800">
+        <div className='overflow-auto rounded border border-border'>
+            <table className='min-w-full border-collapse text-sm'>
+                <thead className='bg-secondary'>
                     <tr>
                         {columns.map((col) => (
                             <th
                                 key={col}
-                                className="border-b border-slate-700 p-2 text-left font-semibold text-slate-200"
+                                className='border-b border-border p-2 text-left font-semibold text-white'
                             >
                                 {col}
                             </th>
@@ -31,12 +31,12 @@ export default function LogTable({ logs, columns }: Props) {
                     {logs.map((log) => (
                         <tr
                             key={log._row_key}
-                            className="odd:bg-slate-900 even:bg-slate-950 hover:bg-slate-800/60"
+                            className='odd:bg-primary/30 even:bg-primary/20 hover:bg-accent/50 '
                         >
                             {columns.map((col) => (
                                 <td
                                     key={col}
-                                    className="border-b border-slate-800 p-2 align-top font-mono text-xs"
+                                    className='border-b border-border p-2 align-top font-mono text-xs'
                                 >
                                     {col === "timestamp"
                                         ? formatTimestamp(log.timestamp)

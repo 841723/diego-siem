@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"backend/internal/model"
 	"backend/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -24,8 +25,14 @@ func (h *LogsHandler) GetLogs(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid source ID"})
 		return
 	}
+	body := model.GetLogsParams{}
+	if err := c.BindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+	body.SourceID = sourceID
 
-	sources, err := h.storage.GetLogs(sourceID)
+	sources, err := h.storage.GetLogs(body)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -46,7 +53,7 @@ func LogRegisterRoutes(r *gin.Engine, storage *storage.Storage) {
 	handler := NewLogsHandler(storage)
 	logsGroup := r.Group("/logs")
 
-	logsGroup.GET("/:id", handler.GetLogs)
+	logsGroup.POST("/:id", handler.GetLogs)
 
 	logsGroup.DELETE("/all", handler.DeleteLogs)
 }
