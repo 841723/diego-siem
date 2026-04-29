@@ -1,4 +1,4 @@
-import type { LogEntry, SourceConfig } from "../types";
+import type { LogEntry, Mapping, Pipeline, SourceConfig } from "../types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -54,4 +54,50 @@ export async function getLogs(sourceId: number): Promise<LogEntry[]> {
         }
     );
     return normalizeLogs(payload);
+}
+
+// ── Mappings ─────────────────────────────────────────────────────────────────
+
+export async function getMappings(): Promise<Mapping[]> {
+    const payload = await request<Mapping[]>("/mappings");
+    return Array.isArray(payload) ? payload : [];
+}
+
+export async function createMapping(mapping: Omit<Mapping, "id">): Promise<void> {
+    await request<void>("/mappings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mapping),
+    });
+}
+
+export async function deleteMapping(id: number): Promise<void> {
+    await request<void>(`/mappings/${id}`, { method: "DELETE" });
+}
+
+export async function duplicateMapping(id: number): Promise<void> {
+    await request<void>(`/mappings/${id}/duplicate`, { method: "POST" });
+}
+
+// ── Pipelines ─────────────────────────────────────────────────────────────────
+
+export async function getPipelines(): Promise<Pipeline[]> {
+    const payload = await request<Pipeline[]>("/pipelines");
+    return Array.isArray(payload) ? payload : [];
+}
+
+export async function createPipeline(pipeline: Omit<Pipeline, "id">): Promise<void> {
+    await request<void>("/pipelines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pipeline),
+    });
+}
+
+export async function deletePipeline(id: number): Promise<void> {
+    await request<void>(`/pipelines/${id}`, { method: "DELETE" });
+}
+
+export async function duplicatePipeline(id: number): Promise<void> {
+    await request<void>(`/pipelines/${id}/duplicate`, { method: "POST" });
 }

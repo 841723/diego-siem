@@ -60,66 +60,123 @@ Response:
 
 ## Mappings
 
-### `POST /mappings`
-
-Request:
-
-```json
-{
-  "id": "syslog-default",
-  "fields": ["timestamp", "host", "program", "severity", "message"]
-}
-```
-
-Response: `201 Created`
-
-```json
-{ "id": "syslog-default" }
-```
-
 ### `GET /mappings`
+
+Lista todos los mappings existentes.
 
 Response:
 
 ```json
 [
   {
-    "id": "syslog-default",
-    "fields": ["timestamp", "host", "program", "severity", "message"]
+    "id": 1,
+    "name": "syslog-default",
+    "fields": [
+      { "name": "host", "type": "string" },
+      { "name": "severity", "type": "string" },
+      { "name": "message", "type": "string" },
+      { "name": "timestamp", "type": "date" }
+    ]
   }
 ]
+```
+
+### `POST /mappings`
+
+Crea un nuevo mapping.
+
+Request:
+
+```json
+{
+  "name": "syslog-default",
+  "fields": [
+    { "name": "host", "type": "string" },
+    { "name": "severity", "type": "string" },
+    { "name": "message", "type": "string" }
+  ]
+}
+```
+
+Response: `201 Created`
+
+```json
+{ "id": 1, "name": "syslog-default" }
+```
+
+### `DELETE /mappings/{id}`
+
+Elimina un mapping por su ID numérico.
+
+Response: `204 No Content`
+
+### `POST /mappings/{id}/duplicate`
+
+Duplica un mapping existente creando una copia con nombre sufijado.
+
+Response: `201 Created`
+
+```json
+{ "id": 2, "name": "syslog-default (copy)" }
 ```
 
 ## Pipelines
 
-### `POST /pipelines`
-
-Request:
-
-```json
-{
-  "id": "syslog-normalize",
-  "processors": ["parse_syslog", "normalize_severity", "extract_ip"]
-}
-```
-
-Response: `201 Created`
-
-```json
-{ "id": "syslog-normalize" }
-```
-
 ### `GET /pipelines`
+
+Lista todos los pipelines existentes.
 
 Response:
 
 ```json
 [
   {
-    "id": "syslog-normalize",
-    "processors": ["parse_syslog", "normalize_severity", "extract_ip"]
+    "id": 1,
+    "name": "syslog-normalize",
+    "processors": [
+      { "type": "set", "config": { "field": "host", "value": "unknown" } },
+      { "type": "lowercase", "config": { "field": "severity" } }
+    ]
   }
 ]
+```
+
+### `POST /pipelines`
+
+Crea un nuevo pipeline.
+
+Request:
+
+```json
+{
+  "name": "syslog-normalize",
+  "processors": [
+    { "type": "set", "config": { "field": "host", "value": "unknown" } },
+    { "type": "lowercase", "config": { "field": "severity" } }
+  ]
+}
+```
+
+Response: `201 Created`
+
+```json
+{ "id": 1, "name": "syslog-normalize" }
+```
+
+### `DELETE /pipelines/{id}`
+
+Elimina un pipeline por su ID numérico.
+
+Response: `204 No Content`
+
+### `POST /pipelines/{id}/duplicate`
+
+Duplica un pipeline existente creando una copia con nombre sufijado.
+
+Response: `201 Created`
+
+```json
+{ "id": 2, "name": "syslog-normalize (copy)" }
 ```
 
 ## Reglas
