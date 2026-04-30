@@ -41,19 +41,22 @@ function normalizeLogs(payload: unknown): LogEntry[] {
     });
 }
 
-export async function getLogs(sourceId: number): Promise<LogEntry[]> {
+export async function getLogs(sourceId: number, timeWindow: string, from: number, size: number): Promise<{ logs: LogEntry[]; total: number }> {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     const payload = await request<unknown>(`/logs/${sourceId}`,
         {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                timeWindow: "now-1m",
-                from: 0,
-                size: 100,
+                timeWindow: timeWindow,
+                from: from,
+                size: size,
             }),
         }
     );
-    return normalizeLogs(payload);
+    const { logs, total } = payload as { logs: unknown[]; total: number };
+    return { logs: normalizeLogs(logs), total };
 }
 
 // ── Mappings ─────────────────────────────────────────────────────────────────

@@ -37,7 +37,13 @@ func (h *LogsHandler) GetLogs(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, sources)
+
+	count, err := h.storage.CountLogs(body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"logs": sources, "total": count})
 }
 
 func (h *LogsHandler) DeleteLogs(c *gin.Context) {

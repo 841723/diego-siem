@@ -2,22 +2,20 @@
 
 :root {
   /* Brand */
-  --primary-raw: #899878;
-  --secondary-raw: #424b47;
+  --primary-raw: #d3d6d8;
+  --secondary-raw: #24313d;
 
   /* Layout */
-  --background-raw: #acacac;
-  --surface-raw: #e6ebe2;
-  --border-raw: #2C2A2B;
+  --background-raw: #38414b;
+  --surface-raw: #a7adb1;
 
   /* Text */
-  --muted-raw: white;
+  --muted-raw: #d3d6d8;
   --text-raw: #404136;
-  --text-logo-raw: white;
+  --text-logo-raw: #F2F2F2;
 
   /* Accent */
-  /* --accent-raw: #4c7c54; */
-  --accent-raw: #6982a8;
+  --accent-raw: #2d63b4;
 
   /* States */
   --success-raw: #4ADE80;
@@ -33,7 +31,6 @@
 
     --color-background: var(--background-raw);
     --color-surface: var(--surface-raw);
-    --color-border: var(--border-raw);
 
     --color-muted: var(--muted-raw);
     --color-text: var(--text-raw);

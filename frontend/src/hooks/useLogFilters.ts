@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { getLogs } from "../services/api";
 import type { LogEntry, TimeWindow } from "../types";
 
-export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 export const DEFAULT_PAGE_SIZE = 25;
 export const DEFAULT_COLUMNS = ["timestamp", "sourceid"];
 
@@ -12,12 +12,12 @@ const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
 export const TIME_WINDOWS: TimeWindow[] = [
-    { label: "Último minuto", value: "1m", ms: MINUTE_MS },
-    { label: "Últimos 15 minutos", value: "15m", ms: 15 * MINUTE_MS },
-    { label: "Última hora", value: "1h", ms: HOUR_MS },
-    { label: "Últimas 6 horas", value: "6h", ms: 6 * HOUR_MS },
-    { label: "Últimas 24 horas", value: "24h", ms: DAY_MS },
-    { label: "Últimos 7 días", value: "7d", ms: 7 * DAY_MS },
+    { label: "Último minuto", value: "now-1m", ms: MINUTE_MS },
+    { label: "Últimos 15 minutos", value: "now-15m", ms: 15 * MINUTE_MS },
+    { label: "Última hora", value: "now-1h", ms: HOUR_MS },
+    { label: "Últimas 6 horas", value: "now-6h", ms: 6 * HOUR_MS },
+    { label: "Últimas 24 horas", value: "now-24h", ms: DAY_MS },
+    { label: "Últimos 7 días", value: "now-7d", ms: 7 * DAY_MS },
     { label: "Todo", value: "all", ms: null },
 ];
 
@@ -28,7 +28,18 @@ export function toTimestampMs(value: number): number {
 }
 
 export function formatTimestamp(value: number): string {
-    return new Date(toTimestampMs(value)).toLocaleString();
+    // dd/MM/yyyy HH:mm:ss
+    return new Date(toTimestampMs(value)).toLocaleDateString(
+        "es-ES",
+        {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+        }
+    );
 }
 
 export function formatCellValue(value: unknown): string {
@@ -44,12 +55,14 @@ export type LogFiltersState = {
     columns: string[];
     page: number;
     pageSize: number;
+    totalLogs: number;
     setSource: (id: number | null) => void;
     setTimeWindow: (v: string) => void;
     setFilterText: (v: string) => void;
     toggleColumn: (col: string) => void;
     setPage: (p: number) => void;
     setPageSize: (s: number) => void;
+    setTotalLogs: (n: number) => void;
     filteredLogs: LogEntry[];
     paginatedLogs: LogEntry[];
     availableColumns: string[];
@@ -77,7 +90,7 @@ export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
     };
 
     const sourceId = parseSourceId();
-    const timeWindow = searchParams.get("time") ?? "1h";
+    const timeWindow = searchParams.get("time") ?? "now-1h";
     const filterText = searchParams.get("q") ?? "";
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
     const pageSize = (() => {
@@ -90,6 +103,7 @@ export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
     const [logsLoading, setLogsLoading] = useState(false);
     const [logsError, setLogsError] = useState("");
     const [fetchTick, setFetchTick] = useState(0);
+    const [totalLogs, setTotalLogs] = useState(0);
 
     function updateParams(updates: Record<string, string | null>) {
         setSearchParams((prev) => {
@@ -118,10 +132,11 @@ export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
         }
         let cancelled = false;
         setLogsLoading(true);
-        getLogs(sourceId)
-            .then((data) => {
+        getLogs(sourceId, timeWindow, (page - 1) * pageSize, pageSize)
+            .then(({ logs, total }) => {
                 if (!cancelled) {
-                    setLogs(data);
+                    setLogs(logs);
+                    setTotalLogs(total);
                     setLogsError("");
                 }
             })
@@ -136,7 +151,6 @@ export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
         return () => {
             cancelled = true;
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sourceId, fetchTick]);
 
     const availableColumns = useMemo(() => {
@@ -218,8 +232,10 @@ export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
         setTimeWindow,
         setFilterText,
         toggleColumn,
+        totalLogs,
         setPage,
         setPageSize,
+        setTotalLogs,
         filteredLogs,
         paginatedLogs,
         availableColumns,

@@ -86,10 +86,8 @@ func (db *ClickHouseDB) LogToDB(log model.Log) error {
 
 func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsParams) ([]model.Log, error) {
 	ctx := context.Background()
+	rows, err := db.conn.Query(ctx, "SELECT timestamp, sourceid, data FROM logs WHERE sourceid = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?", params.SourceID, params.Size, params.From)
 
-	rows, err := db.conn.Query(ctx, "SELECT timestamp, sourceid, data FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?", params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
-
-	fmt.Printf("Executing query: SELECT timestamp, sourceid, data FROM logs WHERE sourceid = %d AND timestamp BETWEEN %s AND %s ORDER BY timestamp DESC LIMIT %d OFFSET %d\n", params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logs: %w", err)
 	}
@@ -117,6 +115,19 @@ func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsParams) ([]model.Log, 
 	fmt.Printf("Retrieved %d logs from ClickHouse®\n", len(logs))
 
 	return logs, nil
+}
+
+func (db *ClickHouseDB) CountLogsFromDB(params model.GetLogsParams) (int, error) {
+	ctx := context.Background()
+	var count uint64
+	//     "error": "failed to count logs: clickhouse [ScanRow]: (COUNT()) converting UInt64 to *int is unsupported. try using *uint64"
+
+	err := db.conn.QueryRow(ctx, "SELECT COUNT(*) FROM logs WHERE sourceid = ?", params.SourceID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count logs: %w", err)
+	}
+
+	return int(count), nil
 }
 
 func (db *ClickHouseDB) DeleteLogsFromDB() error {
