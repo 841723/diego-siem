@@ -2,7 +2,6 @@ package service
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"backend/internal/model"
@@ -24,6 +23,23 @@ type SourceConfigRuntime struct {
 	StorageCh chan model.Log
 
 	StopChan chan struct{}
+}
+
+func (s *SourceManager) NewSourceConfigRuntime(cfg model.SourceConfig) int {
+	max_items_channels := 100
+	parsed_ch := make(chan model.Log, max_items_channels)
+	storage_ch := make(chan model.Log, max_items_channels)
+	stop_ch := make(chan struct{})
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sources[string(cfg.ID)] = &SourceConfigRuntime{
+		Config:    cfg,
+		ParsedCh:  parsed_ch,
+		StorageCh: storage_ch,
+		StopChan:  stop_ch,
+	}
+	return cfg.ID
 }
 
 func (src *SourceConfigRuntime) waitAndProcessLogs(s *storage.Storage) {
@@ -65,58 +81,98 @@ func NewSourceManager(s *storage.Storage) *SourceManager {
 		storage: s,
 	}
 	// Load existing sources from storage
-	existingSources := sm.GetSources()
+	existingSources, err := sm.GetSources()
+	if err != nil {
+		// Handle error
+		return sm
+	}
 	for _, src := range existingSources {
-		sm.AddSource(src)
+		id := sm.NewSourceConfigRuntime(src)
+		sm.StartSource(id)
 	}
 	return sm
 }
 
-func (s *SourceManager) AddSource(cfg model.SourceConfig) {
-	if cfg.Port == 0 || cfg.Protocol == "" || cfg.Parser == "" {
-		return
+func (s *SourceManager) AddSource(cfg model.SourceConfig) (*model.SourceConfig, error) {
+	if !sourceConfigIsFullToUpsert(cfg) {
+		return nil, errors.New("source config is missing required fields")
+	}
+	cfgInDB, err := s.storage.GetSourceByPortAndProtocol(cfg.Port, cfg.Protocol)
+	if err != nil || (cfgInDB != nil && cfgInDB.ID != cfg.ID) {
+		// source with same port and protocol already exists, do not add to DB
+		return nil, errors.New("source with same port and protocol already exists")
 	}
 
-	// if is not in DB, add it
-	if s.validAddToDBSource(cfg) {
-		ID, err := s.storage.AddSource(cfg)
-		if err != nil {
-			fmt.Printf("Error adding source: %v\n", err)
-			return
-		}
-		cfg.ID = ID
+	ID, err := s.storage.AddSource(cfg)
+	if err != nil {
+		return nil, errors.New("error adding source to DB")
 	}
+	cfg.ID = ID
 
-	max_items_channels := 100
-	parsed_ch := make(chan model.Log, max_items_channels)
-	storage_ch := make(chan model.Log, max_items_channels)
-	stop_ch := make(chan struct{})
+	id := s.NewSourceConfigRuntime(cfg)
+	s.StartSource(id)
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.sources[string(cfg.ID)] = &SourceConfigRuntime{
-		Config:    cfg,
-		ParsedCh:  parsed_ch,
-		StorageCh: storage_ch,
-		StopChan:  stop_ch,
-	}
-
-	s.StartSource(cfg.ID)
+	return &cfg, nil
 }
 
-func (s *SourceManager) GetSources() []model.SourceConfig {
+func (s *SourceManager) UpdateSource(cfg model.SourceConfig) (*model.SourceConfig, error) {
+	if !sourceConfigIsFullToUpsert(cfg) {
+		return nil, errors.New("source config is missing required fields")
+	}
+
+	existingSource, err := s.storage.GetSourceByID(cfg.ID)
+	if err != nil || existingSource == nil {
+		return nil, errors.New("source with given ID does not exist")
+	}
+
+	if s.sources[string(cfg.ID)] != nil {
+		s.StopSource(cfg.ID)
+		delete(s.sources, string(cfg.ID))
+	}
+
+	cfgInDB, err := s.storage.GetSourceByPortAndProtocol(cfg.Port, cfg.Protocol)
+	if err != nil || cfgInDB.ID != cfg.ID {
+		// source with same port and protocol already exists, do not add to DB
+		return nil, errors.New("source with same port and protocol already exists")
+	}
+
+	err = s.storage.UpdateSource(cfg)
+	if err != nil {
+		return nil, errors.New("error updating source in DB")
+	}
+
+	id := s.NewSourceConfigRuntime(cfg)
+	s.StartSource(id)
+
+	return &cfg, nil
+}
+
+func (s *SourceManager) GetSources() ([]model.SourceConfig, error) {
 	sources, err := s.storage.GetSources()
 	if err != nil {
 		// Handle error
-		return nil
+		return nil, err
 	}
-	return sources
+	return sources, nil
+}
+
+func (s *SourceManager) GetSourceByID(id int) (*model.SourceConfig, error) {
+	source, err := s.storage.GetSourceByID(id)
+	if err != nil {
+		// Handle error
+		return nil, err
+	}
+	return source, nil
 }
 
 func (s *SourceManager) ClearSources() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return errors.New("not implemented")
+}
+
+func (s *SourceManager) ClearSourceByID(id int) error {
+	return s.storage.DeleteSourceByID(id)
 }
 
 func (s *SourceManager) StartSource(id int) {
@@ -147,17 +203,6 @@ func (s *SourceManager) StopSource(id int) {
 	// delete(s.sources, id)
 }
 
-func (s *SourceManager) validAddToDBSource(cfg model.SourceConfig) bool {
-	if cfg.Port == 0 || cfg.Protocol == "" || cfg.Parser == "" {
-		return false
-	}
-
-	sources := s.GetSources()
-	for _, src := range sources {
-		if src.Port == cfg.Port && src.Protocol == cfg.Protocol {
-			return false
-		}
-	}
-
-	return true
+func sourceConfigIsFullToUpsert(cfg model.SourceConfig) bool {
+	return cfg.Name != "" && cfg.Port != 0 && cfg.Protocol != "" && cfg.Parser != "" && cfg.PipelineID != 0
 }

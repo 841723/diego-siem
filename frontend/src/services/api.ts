@@ -58,8 +58,6 @@ function normalizeLogs(payload: unknown): LogEntry[] {
 }
 
 export async function getLogs(sourceId: number, timeWindow: string, from: number, size: number): Promise<{ logs: LogEntry[]; total: number }> {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
     const payload = await request<unknown>(`/logs/${sourceId}`,
         {
             method: "POST",

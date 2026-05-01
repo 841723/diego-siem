@@ -67,7 +67,7 @@ export default function LogsPage() {
             /> */}
             <header className='flex flex-wrap gap-4 bg-background p-4'>
                 <Select
-                    list={sources}
+                    list={sources.sort((a, b) => a.name.localeCompare(b.name))}
                     selected={String(sourceId)}
                     getValue={(item) => String(item.id)}
                     onSelect={(item: SourceConfig | null) =>
@@ -104,6 +104,13 @@ export default function LogsPage() {
                     renderOption={(item) => item.toString()}
                     label='Cantidad'
                 />
+                <button
+                    className='self-end rounded bg-accent px-3 py-2 text-sm text-muted font-semibold uppercase tracking-wider hover:bg-accent/80 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 h-[37.6px] w-20'
+                    onClick={refetchLogs}
+                    disabled={logsLoading}
+                >
+                    {logsLoading ? "..." : "Buscar"}
+                </button>
             </header>
 
             <section className='overflow-hidden grid grid-cols-[1fr_4fr]'>

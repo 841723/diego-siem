@@ -31,7 +31,8 @@ CREATE TABLE SourceConfig (
     Parser VARCHAR(255) NOT NULL,
     Name VARCHAR(255) NOT NULL,
     PipelineID INT NOT NULL,
-    FOREIGN KEY (PipelineID) REFERENCES Pipelines(ID)
+    FOREIGN KEY (PipelineID) REFERENCES Pipelines(ID),
+    UNIQUE (Port, Protocol)
 );
 
 INSERT INTO Pipelines (Name, Description) VALUES 

@@ -13,38 +13,44 @@ export default function DataTable({ headers, rows, emptyMessage }: Props) {
     }
 
     return (
-        <div className="overflow-auto rounded border border-border">
-            <table className="min-w-full border-collapse text-sm">
-                <thead className="bg-secondary">
-                    <tr>
-                        {headers.map((h) => (
-                            <th
-                                key={h}
-                                className="border-b border-border p-2 text-left font-semibold text-white"
+        <div className='flex-1 flex flex-col overflow-hidden'>
+            <div
+                className='grid bg-secondary text-white text-sm tracking-wider'
+                style={{
+                    gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))`,
+                }}
+            >
+                {headers.map((col) => (
+                    <div
+                        key={col}
+                        className='border-b border-border p-2 text-left font-semibold text-white'
+                    >
+                        {col}
+                    </div>
+                ))}
+            </div>
+            <div className='flex-1 overflow-auto'>
+                {rows.map((cells, idx) => (
+                    <div
+                        key={idx}
+                        className='grid odd:bg-primary/30 even:bg-primary/20 cursor-default'
+                        style={{
+                            gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))`,
+                        }}
+                    >
+                        {cells.map((cell, colIdx) => (
+                            <div
+                                key={colIdx}
+                                className='border-b border-border p-2 align-top text-sm'
                             >
-                                {h}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows.map((cells, rowIdx) => (
-                        <tr
-                            key={rowIdx}
-                            className="odd:bg-primary/30 even:bg-primary/20 hover:bg-accent/50"
-                        >
-                            {cells.map((cell, colIdx) => (
-                                <td
-                                    key={colIdx}
-                                    className="border-b border-border p-2 align-top text-sm"
-                                >
+                                <span className='line-clamp-2 font-mono'>
                                     {cell}
-                                </td>
-                            ))}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }

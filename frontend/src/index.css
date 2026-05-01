@@ -15,11 +15,11 @@
   --text-logo-raw: #F2F2F2;
 
   /* Accent */
-  --accent-raw: #2d63b4;
+  --accent-raw: #5e85be;
 
   /* States */
   --success-raw: #4ADE80;
-  --error-raw: #F87171;
+  --error-raw: #cf2a2a;
   --warning-raw: #FBBF24;
   --info-raw: #60A5FA;
 }
