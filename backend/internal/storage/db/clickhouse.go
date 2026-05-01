@@ -10,7 +10,6 @@ import (
 	"backend/internal/model"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
-	// "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 )
 
 type ClickHouseDB struct {
@@ -86,8 +85,7 @@ func (db *ClickHouseDB) LogToDB(log model.Log) error {
 
 func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsParams) ([]model.Log, error) {
 	ctx := context.Background()
-	rows, err := db.conn.Query(ctx, "SELECT timestamp, sourceid, data FROM logs WHERE sourceid = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?", params.SourceID, params.Size, params.From)
-
+	rows, err := db.conn.Query(ctx, "SELECT timestamp, sourceid, data FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?", params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logs: %w", err)
 	}
@@ -122,7 +120,7 @@ func (db *ClickHouseDB) CountLogsFromDB(params model.GetLogsParams) (int, error)
 	var count uint64
 	//     "error": "failed to count logs: clickhouse [ScanRow]: (COUNT()) converting UInt64 to *int is unsupported. try using *uint64"
 
-	err := db.conn.QueryRow(ctx, "SELECT COUNT(*) FROM logs WHERE sourceid = ?", params.SourceID).Scan(&count)
+	err := db.conn.QueryRow(ctx, "SELECT COUNT(*) FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ?", params.SourceID, params.TimestampFrom, params.TimestampTo).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count logs: %w", err)
 	}

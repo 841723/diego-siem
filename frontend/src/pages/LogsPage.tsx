@@ -1,7 +1,5 @@
 import ColumnsDisplay from "../components/ColumnsDisplay";
-import EmptyState from "../components/EmptyState";
-import FilterBar from "../components/FilterBar";
-import LoadingState from "../components/LoadingState";
+import Pagination from "../components/Pagination";
 import LogTable from "../components/LogTable";
 import Select from "../components/Select";
 import {
@@ -20,19 +18,18 @@ export default function LogsPage() {
 
     const {
         sourceId,
-        timeWindow,
         filterText,
         columns,
         page,
         pageSize,
         totalLogs,
+        timeWindow,
         setSource,
         setTimeWindow,
         setFilterText,
         toggleColumn,
         setPage,
         setPageSize,
-        // setTotalLogs,
         filteredLogs,
         paginatedLogs,
         availableColumns,
@@ -43,29 +40,14 @@ export default function LogsPage() {
     } = filters;
 
     return (
-        <main className='flex flex-col gap-4 overflow-hidden h-full'>
+        <main className='flex flex-col gap-2 overflow-hidden h-full'>
             {logsError && (
                 <p className='rounded bg-error/40 px-3 py-2 text-sm text-error'>
                     {logsError}
                 </p>
             )}
 
-            {/* <FilterBar
-                sources={sources}
-                selectedId={sourceId}
-                onSelectSource={setSource}
-                timeWindow={timeWindow}
-                onTimeWindowChange={setTimeWindow}
-                filterText={filterText}
-                onFilterTextChange={setFilterText}
-                availableColumns={availableColumns}
-                selectedColumns={columns}
-                onToggleColumn={toggleColumn}
-                pageSize={pageSize}
-                onPageSizeChange={setPageSize}
-                onSearch={refetchLogs}
-            /> */}
-            <header className='flex flex-wrap gap-4 bg-background p-4'>
+            <header className='flex flex-wrap gap-4 bg-background p-4  pt-2'>
                 <Select
                     list={sources.sort((a, b) => a.name.localeCompare(b.name))}
                     selected={String(sourceId)}
@@ -90,20 +72,20 @@ export default function LogsPage() {
                 </div>
                 <Select
                     list={TIME_WINDOWS}
-                    selected={null}
+                    selected={timeWindow}
                     getValue={(item) => item.value}
                     onSelect={(item) => item && setTimeWindow(item.value)}
                     renderOption={(item) => item.label}
                     label='Ventana'
                 />
-                <Select
+                {/* <Select
                     list={PAGE_SIZE_OPTIONS}
                     selected={pageSize.toString()}
                     getValue={(item) => item.toString()}
                     onSelect={(item) => item && setPageSize(Number(item))}
                     renderOption={(item) => item.toString()}
                     label='Cantidad'
-                />
+                /> */}
                 <button
                     className='self-end rounded bg-accent px-3 py-2 text-sm text-muted font-semibold uppercase tracking-wider hover:bg-accent/80 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 h-[37.6px] w-20'
                     onClick={refetchLogs}
@@ -113,32 +95,32 @@ export default function LogsPage() {
                 </button>
             </header>
 
-            <section className='overflow-hidden grid grid-cols-[1fr_4fr]'>
+            <section className='overflow-hidden grid grid-cols-[1fr_7fr]'>
                 <ColumnsDisplay
                     columns={columns}
                     availableColumns={availableColumns}
                     toggleColumn={toggleColumn}
                 />
-                <div className='flex flex-col gap-4 overflow-hidden'>
+                <div className='flex flex-col gap-2 overflow-hidden'>
                     <span className='block text-xs font-semibold uppercase tracking-wider text-muted'>
                         En total: {totalLogs} logs
                     </span>
                     <LogTable
-                        logsLoading={logsLoading}
+                        loading={logsLoading}
                         logs={paginatedLogs}
                         columns={columns}
                     />
+                    <Pagination
+                        currentPage={page}
+                        totalPages={totalPages}
+                        onPageChange={setPage}
+                        shownCount={paginatedLogs.length}
+                        totalCount={filteredLogs.length}
+                        pageSize={pageSize}
+                        pageSizeOptions={PAGE_SIZE_OPTIONS}
+                        onPageSizeChange={setPageSize}
+                    />
                 </div>
-                {/* <Pagination
-                    currentPage={page}
-                    totalPages={totalPages}
-                    onPageChange={setPage}
-                    shownCount={paginatedLogs.length}
-                    totalCount={filteredLogs.length}
-                    pageSize={pageSize}
-                    pageSizeOptions={PAGE_SIZE_OPTIONS}
-                    onPageSizeChange={setPageSize}
-                /> */}
             </section>
         </main>
     );

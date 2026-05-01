@@ -2,23 +2,23 @@ import { formatCellValue, formatTimestamp } from "../hooks/useLogFilters";
 import type { LogEntry } from "../types";
 
 type Props = {
-    logsLoading: boolean;
+    loading: boolean;
     logs: LogEntry[];
     columns: string[];
 };
 
 const getCellValue = (
-    logsLoading: boolean,
+    loading: boolean,
     log: LogEntry,
     col: string,
 ): string => {
-    if (logsLoading) return " ";
+    if (loading) return " ";
     if (col === "timestamp") return formatTimestamp(log.timestamp);
     if (col === "sourceid") return String(log.sourceid);
     return formatCellValue(log.data?.[col]);
 };
 
-export default function LogTable({ logsLoading = true, logs, columns }: Props) {
+export default function LogTable({ loading = true, logs, columns }: Props) {
     // if (logs.length === 0) {
     //     return <EmptyState message="No hay logs para los criterios seleccionados" />;
     // }
@@ -52,9 +52,9 @@ export default function LogTable({ logsLoading = true, logs, columns }: Props) {
                                 className='group relative p-1 border-3 border-transparent text-xs wrap-break-word h-8 my-auto hover:border-primary hover:rounded-r hover:rounded-b'
                             >
                                 <span className='line-clamp-2 font-mono'>
-                                    {getCellValue(logsLoading, log, col)}
+                                    {getCellValue(loading, log, col)}
                                 </span>
-                                {!logsLoading && (
+                                {!loading && (
                                     <div 
                                         className='absolute -top-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 bg-primary px-1 py-0.5 z-10'
                                         style={{
@@ -69,7 +69,7 @@ export default function LogTable({ logsLoading = true, logs, columns }: Props) {
                                             onClick={() => {
                                                 navigator.clipboard.writeText(
                                                     getCellValue(
-                                                        logsLoading,
+                                                        loading,
                                                         log,
                                                         col,
                                                     ),
@@ -94,7 +94,7 @@ export default function LogTable({ logsLoading = true, logs, columns }: Props) {
                                             onClick={() => {
                                                 navigator.clipboard.writeText(
                                                     getCellValue(
-                                                        logsLoading,
+                                                        loading,
                                                         log,
                                                         col,
                                                     ),
@@ -118,7 +118,7 @@ export default function LogTable({ logsLoading = true, logs, columns }: Props) {
                                             onClick={() => {
                                                 navigator.clipboard.writeText(
                                                     getCellValue(
-                                                        logsLoading,
+                                                        loading,
                                                         log,
                                                         col,
                                                     ),

@@ -10,7 +10,7 @@ const NAV_ITEMS = [
 export default function Header() {
     return (
         <nav className='sticky top-0 z-10 w-full border-b border-border bg-secondary'>
-            <div className='mx-auto flex justify-between items-center gap-6 px-6 py-4'>
+            <div className='mx-auto flex justify-between items-center gap-6 px-6 py-2'>
                 <a
                     className='text-xl font-bold tracking-tight text-text-logo flex items-center'
                     href='/'

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"backend/internal/lib"
 	"backend/internal/model"
 	"backend/internal/storage"
 
@@ -31,6 +32,11 @@ func (h *LogsHandler) GetLogs(c *gin.Context) {
 		return
 	}
 	body.SourceID = sourceID
+	body.TimestampFrom, body.TimestampTo, err = lib.FormatTimeWindowToUnix(body.TimeWindow)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	sources, err := h.storage.GetLogs(body)
 	if err != nil {

@@ -20,20 +20,20 @@ export default function Pagination({
     onPageSizeChange,
 }: Props) {
     return (
-        <div className='mt-3 flex flex-wrap items-center justify-between gap-3 text-sm'>
-            <p className='text-text'>
+        <div className='flex items-center gap-3 text-sm text-muted w-full p-2 pt-0'>
+            <p className='flex-1'>
                 Mostrando{" "}
-                <span className='font-semibold text-text'>{shownCount}</span>{" "}
+                <span className='font-semibold '>{shownCount}</span>{" "}
                 de{" "}
-                <span className='font-semibold text-text'>{totalCount}</span>{" "}
+                <span className='font-semibold '>{totalCount}</span>{" "}
                 logs
             </p>
 
             <div className='flex items-center gap-4'>
-                <label className='flex items-center gap-2 text-text'>
+                <label className='flex items-center gap-2'>
                     Filas
                     <select
-                        className='rounded border border-border bg-surface px-2 py-1 text-text'
+                        className='rounded border border-border bg-surface px-2 py-1 '
                         value={pageSize}
                         onChange={(e) =>
                             onPageSizeChange(Number(e.target.value))
@@ -55,7 +55,7 @@ export default function Pagination({
                     >
                         ‹
                     </button>
-                    <span className='min-w-24 text-center text-text'>
+                    <span className='min-w-24 text-center '>
                         Página {currentPage} / {totalPages}
                     </span>
                     <button

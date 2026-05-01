@@ -4,69 +4,69 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
-// params.TimeWindow -> "now-1m" OR "now-1h" OR "now-1d"
-func ClickHouse_FormatTimeWindow(timeWindow string) (string, string, error) {
-	// separar el timeWindow en partes para obtener el to y el from
-	// ejemplo: "now-1m" -> ["now", "1m"]
-	// ejemplo: "now-1h" -> ["now", "1h"]
-	// ejemplo: "now-1d" -> ["now", "1d"]
+// now:::now-1h -> timestampFrom, timestampTo
 
-	split := strings.Split(timeWindow, "-")
-	if len(split) != 2 {
+func FormatTimeWindowToUnix(timeWindow string) (string, string, error) {
+	fmt.Printf("Formatting time window: %s\n", timeWindow)
+	if timeWindow == "all" {
+		return "0", strconv.FormatInt(^int64(0), 10), nil // from 1970 to max int64
+	}
+
+	parts := strings.Split(timeWindow, ":::")
+	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid time window format")
 	}
 
-	from, err := formatTimestampToClickHouse(split[0])
+	now := time.Now().Unix()
+
+	timestampFrom, err := parseTimeExpression(parts[1], now)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to format from timestamp: %w", err)
+		return "", "", fmt.Errorf("invalid time expression: %w", err)
 	}
 
-	to, err := formatTimestampToClickHouse(split[1])
+	timestampTo, err := parseTimeExpression(parts[0], now)
+	fmt.Printf("Parsed timestamp to: %d\n", timestampTo)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to format to timestamp: %w", err)
+		return "", "", fmt.Errorf("invalid time expression: %w", err)
 	}
 
-	return from, to, nil
+	return strconv.FormatInt(timestampFrom, 10), strconv.FormatInt(timestampTo, 10), nil
 }
 
-func formatTimestampToClickHouse(timestamp string) (string, error) {
-	if timestamp == "now" {
-		return "now()", nil
+func parseTimeExpression(expr string, now int64) (int64, error) {
+	if expr == "now" {
+		return now, nil
 	}
 
-	// ejemplo: "30s" -> 30 segundos
-	// ejemplo: "1m" -> 1 minuto
-	// ejemplo: "1h" -> 1 hora
-	// ejemplo: "1d" -> 1 día
-	// ejemplo: "1w" -> 1 semana
-	// ejemplo: "1M" -> 1 mes
-	// ejemplo: "1y" -> 1 año
-
-	unit := timestamp[len(timestamp)-1]
-	valueStr := timestamp[:len(timestamp)-1]
-	value, err := strconv.Atoi(valueStr)
-	if err != nil {
-		return "", fmt.Errorf("invalid time window value: %w", err)
-	}
-
-	switch unit {
-	case 's':
-		return fmt.Sprintf("now() - INTERVAL %d SECOND", value), nil
-	case 'm':
-		return fmt.Sprintf("now() - INTERVAL %d MINUTE", value), nil
-	case 'h':
-		return fmt.Sprintf("now() - INTERVAL %d HOUR", value), nil
-	case 'd':
-		return fmt.Sprintf("now() - INTERVAL %d DAY", value), nil
-	case 'w':
-		return fmt.Sprintf("now() - INTERVAL %d WEEK", value), nil
-	case 'M':
-		return fmt.Sprintf("now() - INTERVAL %d MONTH", value), nil
-	case 'y':
-		return fmt.Sprintf("now() - INTERVAL %d YEAR", value), nil
+	var multiplier int64
+	switch {
+	case strings.HasSuffix(expr, "s"):
+		multiplier = 1
+		expr = strings.TrimSuffix(expr, "s")
+	case strings.HasSuffix(expr, "m"):
+		multiplier = 60
+		expr = strings.TrimSuffix(expr, "m")
+	case strings.HasSuffix(expr, "h"):
+		multiplier = 3600
+		expr = strings.TrimSuffix(expr, "h")
+	case strings.HasSuffix(expr, "d"):
+		multiplier = 86400
+		expr = strings.TrimSuffix(expr, "d")
 	default:
-		return "", fmt.Errorf("invalid time window unit: %c", unit)
+		return 0, fmt.Errorf("invalid time unit in expression: %s", expr)
 	}
+
+	if strings.HasPrefix(expr, "now-") {
+		expr = strings.TrimPrefix(expr, "now-")
+	}
+
+	num, err := strconv.ParseInt(expr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid time value in expression: %s", expr)
+	}
+
+	return now - num*multiplier, nil
 }

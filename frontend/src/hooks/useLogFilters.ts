@@ -12,14 +12,16 @@ const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
 export const TIME_WINDOWS: TimeWindow[] = [
-    { label: "Último minuto", value: "now-1m", ms: MINUTE_MS },
-    { label: "Últimos 15 minutos", value: "now-15m", ms: 15 * MINUTE_MS },
-    { label: "Última hora", value: "now-1h", ms: HOUR_MS },
-    { label: "Últimas 6 horas", value: "now-6h", ms: 6 * HOUR_MS },
-    { label: "Últimas 24 horas", value: "now-24h", ms: DAY_MS },
-    { label: "Últimos 7 días", value: "now-7d", ms: 7 * DAY_MS },
+    { label: "Último minuto", value: "now:::now-1m", ms: MINUTE_MS },
+    { label: "Últimos 15 minutos", value: "now:::now-15m", ms: 15 * MINUTE_MS },
+    { label: "Última hora", value: "now:::now-1h", ms: HOUR_MS },
+    { label: "Últimas 6 horas", value: "now:::now-6h", ms: 6 * HOUR_MS },
+    { label: "Últimas 24 horas", value: "now:::now-24h", ms: DAY_MS },
+    { label: "Últimos 7 días", value: "now:::now-7d", ms: 7 * DAY_MS },
     { label: "Todo", value: "all", ms: null },
 ];
+
+const DEFAULT_TIMEWINDOW = TIME_WINDOWS[2].value;
 
 const TIMESTAMP_MS_THRESHOLD = 1_000_000_000_000;
 
@@ -29,17 +31,14 @@ export function toTimestampMs(value: number): number {
 
 export function formatTimestamp(value: number): string {
     // dd/MM/yyyy HH:mm:ss
-    return new Date(toTimestampMs(value)).toLocaleDateString(
-        "es-ES",
-        {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-        }
-    );
+    return new Date(toTimestampMs(value)).toLocaleDateString("es-ES", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+    });
 }
 
 export function formatCellValue(value: unknown): string {
@@ -90,12 +89,22 @@ export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
     };
 
     const sourceId = parseSourceId();
-    const timeWindow = searchParams.get("time") ?? "now-1h";
+    const timeWindow = searchParams.get("time") ?? DEFAULT_TIMEWINDOW;
     const filterText = searchParams.get("q") ?? "";
-    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+    const page = Math.max(
+        1,
+        parseInt(searchParams.get("page") ?? "1", 10) || 1,
+    );
     const pageSize = (() => {
-        const n = parseInt(searchParams.get("pageSize") ?? String(DEFAULT_PAGE_SIZE), 10);
-        return PAGE_SIZE_OPTIONS.includes(n as (typeof PAGE_SIZE_OPTIONS)[number]) ? n : DEFAULT_PAGE_SIZE;
+        const n = parseInt(
+            searchParams.get("pageSize") ?? String(DEFAULT_PAGE_SIZE),
+            10,
+        );
+        return PAGE_SIZE_OPTIONS.includes(
+            n as (typeof PAGE_SIZE_OPTIONS)[number],
+        )
+            ? n
+            : DEFAULT_PAGE_SIZE;
     })();
     const columns = parseColumns();
 
@@ -121,7 +130,7 @@ export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
         if (sourceId === null && availableSourceIds.length > 0) {
             updateParams({ source: String(availableSourceIds[0]), page: "1" });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableSourceIds.join(",")]);
 
     // Fetch logs when sourceId or tick changes
@@ -155,27 +164,37 @@ export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
 
     const availableColumns = useMemo(() => {
         const set = new Set<string>(DEFAULT_COLUMNS);
-        logs.forEach((log) => Object.keys(log.data ?? {}).forEach((f) => set.add(f)));
+        logs.forEach((log) =>
+            Object.keys(log.data ?? {}).forEach((f) => set.add(f)),
+        );
         return Array.from(set);
     }, [logs]);
 
     const filteredLogs = useMemo(() => {
         const now = Date.now();
-        const window = TIME_WINDOWS.find((w) => w.value === timeWindow) ?? TIME_WINDOWS[2];
+        const window =
+            TIME_WINDOWS.find((w) => w.value === timeWindow) ?? TIME_WINDOWS[2];
 
         return logs.filter((log) => {
             if (sourceId !== null && log.sourceid !== sourceId) return false;
 
             if (window.ms !== null) {
-                if (toTimestampMs(log.timestamp) < now - window.ms) return false;
+                if (toTimestampMs(log.timestamp) < now - window.ms)
+                    return false;
             }
 
             if (!filterText.trim()) return true;
             const needle = filterText.trim().toLowerCase();
             return columns.some((col) => {
-                if (col === "timestamp") return formatTimestamp(log.timestamp).toLowerCase().includes(needle);
-                if (col === "sourceid") return String(log.sourceid).toLowerCase().includes(needle);
-                return formatCellValue(log.data?.[col]).toLowerCase().includes(needle);
+                if (col === "timestamp")
+                    return formatTimestamp(log.timestamp)
+                        .toLowerCase()
+                        .includes(needle);
+                if (col === "sourceid")
+                    return String(log.sourceid).toLowerCase().includes(needle);
+                return formatCellValue(log.data?.[col])
+                    .toLowerCase()
+                    .includes(needle);
             });
         });
     }, [logs, sourceId, timeWindow, filterText, columns]);
@@ -190,33 +209,38 @@ export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
 
     const setSource = useCallback((id: number | null) => {
         updateParams({ source: id !== null ? String(id) : null, page: "1" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const setTimeWindow = useCallback((v: string) => {
         updateParams({ time: v, page: "1" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const setFilterText = useCallback((v: string) => {
         updateParams({ q: v || null, page: "1" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const toggleColumn = useCallback((col: string) => {
-        const next = columns.includes(col) ? columns.filter((c) => c !== col) : [...columns, col];
-        updateParams({ cols: next.join(","), page: "1" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [columns]);
+    const toggleColumn = useCallback(
+        (col: string) => {
+            const next = columns.includes(col)
+                ? columns.filter((c) => c !== col)
+                : [...columns, col];
+            updateParams({ cols: next.join(","), page: "1" });
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        },
+        [columns],
+    );
 
     const setPage = useCallback((p: number) => {
         updateParams({ page: String(p) });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const setPageSize = useCallback((s: number) => {
         updateParams({ pageSize: String(s), page: "1" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const refetchLogs = useCallback(() => setFetchTick((n) => n + 1), []);

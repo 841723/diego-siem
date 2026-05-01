@@ -17,7 +17,9 @@ export async function getSource(id: number): Promise<SourceConfig> {
     return request<SourceConfig>(`/sources/${id}`);
 }
 
-export async function createSource(source: Omit<SourceConfig, "id"> & { id?: number }): Promise<void> {
+export async function createSource(
+    source: Omit<SourceConfig, "id"> & { id?: number },
+): Promise<void> {
     await request<void>("/sources", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -25,7 +27,10 @@ export async function createSource(source: Omit<SourceConfig, "id"> & { id?: num
     });
 }
 
-export async function updateSource(id: number, source: Omit<SourceConfig, "id">): Promise<void> {
+export async function updateSource(
+    id: number,
+    source: Omit<SourceConfig, "id">,
+): Promise<void> {
     await request<void>(`/sources/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -45,7 +50,8 @@ function normalizeLogs(payload: unknown): LogEntry[] {
     const raw: Array<Omit<LogEntry, "_row_key">> = Array.isArray(payload)
         ? (payload as Array<Omit<LogEntry, "_row_key">>)
         : Array.isArray((payload as { logs?: unknown[] })?.logs)
-          ? ((payload as { logs: Array<Omit<LogEntry, "_row_key">> }).logs ?? [])
+          ? ((payload as { logs: Array<Omit<LogEntry, "_row_key">> }).logs ??
+            [])
           : [];
 
     const seen = new Map<string, number>();
@@ -57,18 +63,21 @@ function normalizeLogs(payload: unknown): LogEntry[] {
     });
 }
 
-export async function getLogs(sourceId: number, timeWindow: string, from: number, size: number): Promise<{ logs: LogEntry[]; total: number }> {
-    const payload = await request<unknown>(`/logs/${sourceId}`,
-        {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                timeWindow: timeWindow,
-                from: from,
-                size: size,
-            }),
-        }
-    );
+export async function getLogs(
+    sourceId: number,
+    timeWindow: string,
+    from: number,
+    size: number,
+): Promise<{ logs: LogEntry[]; total: number }> {
+    const payload = await request<unknown>(`/logs/${sourceId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            timeWindow: timeWindow,
+            from: from,
+            size: size,
+        }),
+    });
     const { logs, total } = payload as { logs: unknown[]; total: number };
     return { logs: normalizeLogs(logs), total };
 }
@@ -84,7 +93,9 @@ export async function getMapping(id: number): Promise<Mapping> {
     return request<Mapping>(`/mappings/${id}`);
 }
 
-export async function createMapping(mapping: Omit<Mapping, "id">): Promise<void> {
+export async function createMapping(
+    mapping: Omit<Mapping, "id">,
+): Promise<void> {
     await request<void>("/mappings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -92,7 +103,10 @@ export async function createMapping(mapping: Omit<Mapping, "id">): Promise<void>
     });
 }
 
-export async function updateMapping(id: number, mapping: Omit<Mapping, "id">): Promise<void> {
+export async function updateMapping(
+    id: number,
+    mapping: Omit<Mapping, "id">,
+): Promise<void> {
     await request<void>(`/mappings/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -119,7 +133,9 @@ export async function getPipeline(id: number): Promise<Pipeline> {
     return request<Pipeline>(`/pipelines/${id}`);
 }
 
-export async function createPipeline(pipeline: Omit<Pipeline, "id">): Promise<void> {
+export async function createPipeline(
+    pipeline: Omit<Pipeline, "id">,
+): Promise<void> {
     await request<void>("/pipelines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -127,7 +143,10 @@ export async function createPipeline(pipeline: Omit<Pipeline, "id">): Promise<vo
     });
 }
 
-export async function updatePipeline(id: number, pipeline: Omit<Pipeline, "id">): Promise<void> {
+export async function updatePipeline(
+    id: number,
+    pipeline: Omit<Pipeline, "id">,
+): Promise<void> {
     await request<void>(`/pipelines/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
