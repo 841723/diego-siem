@@ -107,7 +107,7 @@ func (db *PostgreSQLDB) GetSourcesFromDB() ([]model.SourceConfig, error) {
 	return sources, nil
 }
 
-func (db *PostgreSQLDB) GetSourceByIDFromDB(id int) (*model.SourceConfig, error) {
+func (db *PostgreSQLDB) GetSourceByIDFromDB(id model.ID) (*model.SourceConfig, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var s model.SourceConfig
@@ -161,17 +161,17 @@ func (db *PostgreSQLDB) GetSourceByPortAndProtocolFromDB(port int, protocol stri
 	return &s, nil
 }
 
-func (db *PostgreSQLDB) AddSourceToDB(source model.SourceConfig) (int, error) {
+func (db *PostgreSQLDB) AddSourceToDB(source model.SourceConfig) (model.ID, error) {
 	//
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var id int
+	var id model.ID
 	err := db.pool.QueryRow(ctx,
-		"INSERT INTO SourceConfig (protocol, port, parser, name, pipelineid) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-		source.Protocol, source.Port, source.Parser, source.Name, source.PipelineID).Scan(&id)
+		"INSERT INTO SourceConfig (ID, protocol, port, parser, name, pipelineid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+		source.ID, source.Protocol, source.Port, source.Parser, source.Name, source.PipelineID).Scan(&id)
 	if err != nil {
-		return -1, err
+		return model.GenerateErrorUUID(), err
 	}
 	return id, nil
 }
@@ -186,7 +186,7 @@ func (db *PostgreSQLDB) UpdateSourceInDB(source model.SourceConfig) error {
 	return err
 }
 
-func (db *PostgreSQLDB) DeleteSourceFromDB(sourceID int) error {
+func (db *PostgreSQLDB) DeleteSourceFromDB(sourceID model.ID) error {
 	// Implement logic to delete a source from PostgreSQL
 	return nil
 }
@@ -196,7 +196,7 @@ func (db *PostgreSQLDB) ClearSourcesFromDB() error {
 	return nil
 }
 
-func (db *PostgreSQLDB) DeleteSourceByIDFromDB(sourceID int) error {
+func (db *PostgreSQLDB) DeleteSourceByIDFromDB(sourceID model.ID) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := db.pool.Exec(ctx,

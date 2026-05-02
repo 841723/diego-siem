@@ -2,7 +2,6 @@ package routes
 
 import (
 	"net/http"
-	"strconv"
 
 	"backend/internal/lib"
 	"backend/internal/model"
@@ -21,11 +20,12 @@ func NewLogsHandler(storage *storage.Storage) *LogsHandler {
 
 func (h *LogsHandler) GetLogs(c *gin.Context) {
 	strSourceID := c.Param("id")
-	sourceID, err := strconv.Atoi(strSourceID)
+	sourceID, err := model.ParseAndCheckUUID(strSourceID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid source ID"})
 		return
 	}
+
 	body := model.GetLogsParams{}
 	if err := c.BindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})

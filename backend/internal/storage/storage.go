@@ -45,7 +45,7 @@ func (s *Storage) GetSources() ([]model.SourceConfig, error) {
 	return s.postgres.GetSourcesFromDB()
 }
 
-func (s *Storage) GetSourceByID(id int) (*model.SourceConfig, error) {
+func (s *Storage) GetSourceByID(id model.ID) (*model.SourceConfig, error) {
 	return s.postgres.GetSourceByIDFromDB(id)
 }
 
@@ -53,7 +53,7 @@ func (s *Storage) GetSourceByPortAndProtocol(port int, protocol string) (*model.
 	return s.postgres.GetSourceByPortAndProtocolFromDB(port, protocol)
 }
 
-func (s *Storage) AddSource(source model.SourceConfig) (int, error) {
+func (s *Storage) AddSource(source model.SourceConfig) (model.ID, error) {
 	return s.postgres.AddSourceToDB(source)
 }
 
@@ -61,7 +61,7 @@ func (s *Storage) UpdateSource(source model.SourceConfig) error {
 	return s.postgres.UpdateSourceInDB(source)
 }
 
-func (s *Storage) DeleteSource(sourceID int) error {
+func (s *Storage) DeleteSource(sourceID model.ID) error {
 	return s.postgres.DeleteSourceFromDB(sourceID)
 }
 
@@ -69,6 +69,14 @@ func (s *Storage) ClearSources() error {
 	return s.postgres.ClearSourcesFromDB()
 }
 
-func (s *Storage) DeleteSourceByID(sourceID int) error {
+func (s *Storage) DeleteSourceByID(sourceID model.ID) error {
 	return s.postgres.DeleteSourceByIDFromDB(sourceID)
+}
+
+func (s *Storage) AddColumnToLogs(columnName, dataType string) error {
+	return s.clickhouse.AddColumnToLogsInDB(columnName, dataType)
+}
+
+func (s *Storage) RemoveColumnFromLogs(columnName string) error {
+	return s.clickhouse.RemoveColumnFromLogsInDB(columnName)
 }

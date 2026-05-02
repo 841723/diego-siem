@@ -40,6 +40,9 @@ func (a *App) initAPI() {
 	// 	/sources
 	routes.SourcesRegisterRoutes(r, &a.sources, &a.storages)
 
+	// 	/schema
+	routes.SchemaRegisterRoutes(r, &a.storages)
+
 	r.Run(":8080")
 }
 
@@ -49,7 +52,7 @@ func (a *App) initSources() {
 		Port:       9001,
 		Parser:     "syslog",
 		Name:       "My Syslog Source",
-		PipelineID: 1,
+		PipelineID: model.ParseUUID("13acfea5-a7ec-4f51-aa4a-fd6949a9f42d"),
 	}
 	a.sources.AddSource(initialSource)
 
@@ -58,7 +61,7 @@ func (a *App) initSources() {
 		Port:       9002,
 		Parser:     "syslog",
 		Name:       "My Syslog Source 2",
-		PipelineID: 1,
+		PipelineID: model.ParseUUID("13acfea5-a7ec-4f51-aa4a-fd6949a9f42d"),
 	}
 	a.sources.AddSource(initialSource2)
 
@@ -67,7 +70,7 @@ func (a *App) initSources() {
 		Port:       9003,
 		Parser:     "syslog",
 		Name:       "My Syslog Source 3",
-		PipelineID: 1,
+		PipelineID: model.ParseUUID("13acfea5-a7ec-4f51-aa4a-fd6949a9f42d"),
 	}
 	a.sources.AddSource(initialSource3)
 }

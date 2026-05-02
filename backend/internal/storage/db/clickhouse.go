@@ -75,8 +75,7 @@ func (db *ClickHouseDB) LogToDB(log model.Log) error {
 	}
 
 	ctx := context.Background()
-	err := db.conn.Exec(ctx, "INSERT INTO logs (timestamp, sourceid, data) VALUES (?, ?, ?)",
-		log.Timestamp, log.SourceID, data)
+	err := db.conn.Exec(ctx, "INSERT INTO logs (ID, timestamp, sourceid, data) VALUES (?, ?, ?, ?)", log.ID, log.Timestamp, log.SourceID, data)
 	if err != nil {
 		return fmt.Errorf("failed to insert log: %w", err)
 	}
@@ -85,7 +84,7 @@ func (db *ClickHouseDB) LogToDB(log model.Log) error {
 
 func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsParams) ([]model.Log, error) {
 	ctx := context.Background()
-	rows, err := db.conn.Query(ctx, "SELECT timestamp, sourceid, data FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?", params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
+	rows, err := db.conn.Query(ctx, "SELECT ID, timestamp, sourceid, data FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?", params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logs: %w", err)
 	}
@@ -94,13 +93,13 @@ func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsParams) ([]model.Log, 
 	var logs []model.Log
 	for rows.Next() {
 		var log model.Log
-		var sourceID int32
+		var sourceID model.ID
 
 		var data map[string]interface{}
-		if err := rows.Scan(&log.Timestamp, &sourceID, &data); err != nil {
+		if err := rows.Scan(&log.ID, &log.Timestamp, &sourceID, &data); err != nil {
 			return nil, fmt.Errorf("failed to scan log row: %w", err)
 		}
-		log.SourceID = int(sourceID)
+		log.SourceID = sourceID
 		log.Data = data
 
 		logs = append(logs, log)
@@ -133,6 +132,41 @@ func (db *ClickHouseDB) DeleteLogsFromDB() error {
 	err := db.conn.Exec(ctx, "TRUNCATE TABLE logs")
 	if err != nil {
 		return fmt.Errorf("failed to delete logs: %w", err)
+	}
+	return nil
+}
+
+func (db *ClickHouseDB) AddColumnToLogsInDB(columnname string, datatype string) error {
+	ctx := context.Background()
+
+	if !isValidClickHouseColumnName(columnname) {
+		return fmt.Errorf("invalid column name: %s", columnname)
+	}
+
+	if !isValidClickHouseDataType(datatype) {
+		return fmt.Errorf("invalid data type: %s", datatype)
+	}
+	query := fmt.Sprintf("ALTER TABLE logs ADD COLUMN IF NOT EXISTS %s %s", columnname, datatype)
+
+	err := db.conn.Exec(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to add column: %w", err)
+	}
+	return nil
+}
+
+func (db *ClickHouseDB) RemoveColumnFromLogsInDB(columnname string) error {
+	ctx := context.Background()
+
+	if !isValidClickHouseColumnName(columnname) {
+		return fmt.Errorf("invalid column name: %s", columnname)
+	}
+
+	query := fmt.Sprintf("ALTER TABLE logs DROP COLUMN IF EXISTS %s", columnname)
+
+	err := db.conn.Exec(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to remove column: %w", err)
 	}
 	return nil
 }

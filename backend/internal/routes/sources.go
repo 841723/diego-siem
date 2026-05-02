@@ -3,7 +3,6 @@ package routes
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"backend/internal/model"
 	"backend/internal/service"
@@ -48,15 +47,15 @@ func (h *SourceHandler) GetSources(c *gin.Context) {
 }
 
 func (h *SourceHandler) GetSourceByID(c *gin.Context) {
-	id := c.Param("id")
-	idInt, err := strconv.Atoi(id)
-	fmt.Printf("Received GetSourceByID request with ID: %s\n", id)
+	strId := c.Param("id")
+	id, err := model.ParseAndCheckUUID(strId)
+	fmt.Printf("Received GetSourceByID request with ID: %s\n", strId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid source ID"})
 		return
 	}
 
-	source, err := h.svc.GetSourceByID(idInt)
+	source, err := h.svc.GetSourceByID(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -65,8 +64,8 @@ func (h *SourceHandler) GetSourceByID(c *gin.Context) {
 }
 
 func (h *SourceHandler) UpdateSource(c *gin.Context) {
-	id := c.Param("id")
-	idInt, err := strconv.Atoi(id)
+	strId := c.Param("id")
+	id, err := model.ParseAndCheckUUID(strId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid source ID"})
 		return
@@ -77,7 +76,7 @@ func (h *SourceHandler) UpdateSource(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	cfg.ID = idInt
+	cfg.ID = id
 
 	_, err = h.svc.UpdateSource(cfg)
 	if err != nil {
@@ -93,19 +92,27 @@ func (h *SourceHandler) ClearSources(c *gin.Context) {
 }
 
 func (h *SourceHandler) ClearSourceByID(c *gin.Context) {
-	id := c.Param("id")
-	idInt, err := strconv.Atoi(id)
+	strId := c.Param("id")
+	id, err := model.ParseAndCheckUUID(strId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid source ID"})
 		return
 	}
 
-	err = h.svc.ClearSourceByID(idInt)
+	err = h.svc.ClearSourceByID(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Source cleared successfully"})
+}
+
+func (h *SourceHandler) TestEndpoint(c *gin.Context) {
+	if err := h.storage.RemoveColumnFromLogs("testcolumn"); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Test column added to logs"})
 }
 
 func SourcesRegisterRoutes(r *gin.Engine, svc *service.SourceManager, storage *storage.Storage) {
@@ -118,4 +125,6 @@ func SourcesRegisterRoutes(r *gin.Engine, svc *service.SourceManager, storage *s
 	sourcesGroup.PUT("/:id", handler.UpdateSource)
 	sourcesGroup.DELETE("", handler.ClearSources)
 	sourcesGroup.DELETE("/:id", handler.ClearSourceByID)
+
+	sourcesGroup.GET("/test", handler.TestEndpoint)
 }

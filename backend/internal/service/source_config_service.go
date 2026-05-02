@@ -25,7 +25,7 @@ type SourceConfigRuntime struct {
 	StopChan chan struct{}
 }
 
-func (s *SourceManager) NewSourceConfigRuntime(cfg model.SourceConfig) int {
+func (s *SourceManager) NewSourceConfigRuntime(cfg model.SourceConfig) model.ID {
 	max_items_channels := 100
 	parsed_ch := make(chan model.Log, max_items_channels)
 	storage_ch := make(chan model.Log, max_items_channels)
@@ -33,7 +33,7 @@ func (s *SourceManager) NewSourceConfigRuntime(cfg model.SourceConfig) int {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.sources[string(cfg.ID)] = &SourceConfigRuntime{
+	s.sources[cfg.ID.String()] = &SourceConfigRuntime{
 		Config:    cfg,
 		ParsedCh:  parsed_ch,
 		StorageCh: storage_ch,
@@ -103,6 +103,9 @@ func (s *SourceManager) AddSource(cfg model.SourceConfig) (*model.SourceConfig, 
 		return nil, errors.New("source with same port and protocol already exists")
 	}
 
+	IDToAdd := model.GenerateUUID()
+	
+	cfg.ID = IDToAdd
 	ID, err := s.storage.AddSource(cfg)
 	if err != nil {
 		return nil, errors.New("error adding source to DB")
@@ -125,9 +128,9 @@ func (s *SourceManager) UpdateSource(cfg model.SourceConfig) (*model.SourceConfi
 		return nil, errors.New("source with given ID does not exist")
 	}
 
-	if s.sources[string(cfg.ID)] != nil {
+	if s.sources[cfg.ID.String()] != nil {
 		s.StopSource(cfg.ID)
-		delete(s.sources, string(cfg.ID))
+		delete(s.sources, cfg.ID.String())
 	}
 
 	cfgInDB, err := s.storage.GetSourceByPortAndProtocol(cfg.Port, cfg.Protocol)
@@ -156,7 +159,7 @@ func (s *SourceManager) GetSources() ([]model.SourceConfig, error) {
 	return sources, nil
 }
 
-func (s *SourceManager) GetSourceByID(id int) (*model.SourceConfig, error) {
+func (s *SourceManager) GetSourceByID(id model.ID) (*model.SourceConfig, error) {
 	source, err := s.storage.GetSourceByID(id)
 	if err != nil {
 		// Handle error
@@ -171,12 +174,12 @@ func (s *SourceManager) ClearSources() error {
 	return errors.New("not implemented")
 }
 
-func (s *SourceManager) ClearSourceByID(id int) error {
+func (s *SourceManager) ClearSourceByID(id model.ID) error {
 	return s.storage.DeleteSourceByID(id)
 }
 
-func (s *SourceManager) StartSource(id int) {
-	src := s.sources[string(id)]
+func (s *SourceManager) StartSource(id model.ID) {
+	src := s.sources[id.String()]
 	if src == nil {
 		return
 	}
@@ -190,19 +193,19 @@ func (s *SourceManager) StartSource(id int) {
 	go src.waitAndStoreLogs(s.storage)
 }
 
-func (s *SourceManager) StopSource(id int) {
+func (s *SourceManager) StopSource(id model.ID) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	src := s.sources[string(id)]
+	src := s.sources[id.String()]
 	if src == nil {
 		return
 	}
 
 	close(src.StopChan)
-	// delete(s.sources, id)
+	delete(s.sources, id.String())
 }
 
 func sourceConfigIsFullToUpsert(cfg model.SourceConfig) bool {
-	return cfg.Name != "" && cfg.Port != 0 && cfg.Protocol != "" && cfg.Parser != "" && cfg.PipelineID != 0
+	return cfg.Name != "" && cfg.Port != 0 && cfg.Protocol != "" && cfg.Parser != "" && cfg.PipelineID != model.GenerateErrorUUID()
 }
