@@ -1,20 +1,12 @@
 import { useEffect, useState } from "react";
-import type { MappingField, MappingType } from "../types";
 import { getGlobalMapping, getMappingTypes } from "../services/api";
+import type { MappingField, MappingType } from "../types";
 
 /**
- * Fallback field types used when GET /mapping-types is unavailable.
+ * Fallback field types used when GET /mappings/types is unavailable.
  * IDs use deterministic zero-padded UUIDs that the backend can recognise once types are seeded.
  */
-export const FALLBACK_MAPPING_TYPES: MappingType[] = [
-    { id: "00000000-0000-0000-0000-000000000001", type_name: "string" },
-    { id: "00000000-0000-0000-0000-000000000002", type_name: "integer" },
-    { id: "00000000-0000-0000-0000-000000000003", type_name: "decimal" },
-    { id: "00000000-0000-0000-0000-000000000004", type_name: "boolean" },
-    { id: "00000000-0000-0000-0000-000000000005", type_name: "date" },
-    { id: "00000000-0000-0000-0000-000000000006", type_name: "ip" },
-    { id: "00000000-0000-0000-0000-000000000007", type_name: "timestamp" },
-];
+export const FALLBACK_MAPPING_TYPES: MappingType[] = [];
 
 export type GlobalMappingState = {
     fields: MappingField[];

@@ -29,24 +29,34 @@ type Pipeline struct {
 	Description string `json:"description"`
 }
 
+type ProcessorSchema = json.RawMessage
+
+type Processor struct {
+	ID          ID              `json:"id"`
+	Description string          `json:"description"`
+	Name        string          `json:"name"`   // e.g., "filter", "enrich", "transform"
+	Schema      ProcessorSchema `json:"schema"` // JSON or other format for processor configuration
+}
+
 type PipelineProcessorConfig = json.RawMessage
 
 type PipelineProcessor struct {
-	ID         ID                      `json:"id"`
-	PipelineID ID                      `json:"pipelineid"`
-	Type       string                  `json:"type"`   // e.g., "filter", "enrich", "transform"
-	Config     PipelineProcessorConfig `json:"config"` // JSON or other format for processor configuration
+	ID          ID                      `json:"id"`
+	PipelineID  ID                      `json:"pipelineid"`
+	ProcessorID ID                      `json:"processorid"`
+	Config      PipelineProcessorConfig `json:"config"` // JSON configuration specific to this processor in the pipeline
 }
 
 type MappingType struct {
-	ID       ID     `json:"id"`
-	TypeName string `json:"type_name"` // e.g., "string", "integer", "timestamp"
+	ID          ID     `json:"id"`
+	TypeName    string `json:"typename"`    // e.g., "string", "integer", "timestamp"
+	DisplayName string `json:"displayname"` // e.g., "String", "Integer", "Timestamp"
 }
 
 type Mapping struct {
-	FieldName    string `json:"field_name"`
-	FieldTypeID  ID     `json:"field_type_id"`
-	DefaultValue string `json:"default_value"`
+	FieldName    string `json:"fieldname"`
+	FieldTypeID  ID     `json:"fieldtypeid"`
+	DefaultValue string `json:"defaultvalue"`
 }
 
 /*

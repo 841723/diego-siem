@@ -1,4 +1,11 @@
-import type { LogEntry, MappingField, MappingType, Pipeline, ProcessorDefinition, SourceConfig } from "../types";
+import type {
+    LogEntry,
+    MappingField,
+    MappingType,
+    Pipeline,
+    ProcessorDefinition,
+    SourceConfig,
+} from "../types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -146,15 +153,15 @@ export async function setGlobalMapping(fields: MappingField[]): Promise<void> {
     await request<void>("/mappings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ Mapping: fields }),
+        body: JSON.stringify(fields),
     });
 }
 
-// ── Mapping types (GET /mapping-types) ───────────────────────────────────────
+// ── Mapping types (GET /mappings/types) ───────────────────────────────────────
 // NOTE: This endpoint is not yet implemented in the backend.
 // The hook useMappingTypes falls back to hardcoded types when this returns 404.
 
 export async function getMappingTypes(): Promise<MappingType[]> {
-    const payload = await request<MappingType[]>("/mapping-types");
+    const payload = await request<MappingType[]>("/mappings/types");
     return Array.isArray(payload) ? payload : [];
 }

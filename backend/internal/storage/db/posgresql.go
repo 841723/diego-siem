@@ -325,6 +325,84 @@ func (db *PostgreSQLDB) DeletePipelineByIDFromDB(pipelineID model.ID) error {
 /*
 ******************************************************
 
+	Processors
+
+*******************************************************
+*/
+
+func (db *PostgreSQLDB) AddProcessorToPipelineInDB(processor model.PipelineProcessor) (model.ID, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var id model.ID
+	err := db.pool.QueryRow(ctx,
+		"INSERT INTO PipelineProcessor (ID, pipelineid, type, config) VALUES ($1, $2, $3, $4) RETURNING id",
+		processor.ID, processor.PipelineID, processor.Type, processor.Config).Scan(&id)
+	if err != nil {
+		return model.GenerateErrorUUID(), err
+	}
+	return id, nil
+}
+
+func (db *PostgreSQLDB) GetProcessorsFromPipelineInDB(pipelineID model.ID) ([]model.PipelineProcessor, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := db.pool.Query(ctx, `
+		SELECT id, pipelineid, name, config
+		FROM pipelineprocessor
+		WHERE pipelineid = $1
+	`, pipelineID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var processors []model.PipelineProcessor
+
+	for rows.Next() {
+		var p model.PipelineProcessor
+
+		err := rows.Scan(
+			&p.ID,
+			&p.PipelineID,
+			&p.Type,
+			&p.Config,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		processors = append(processors, p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return processors, nil
+}
+
+func (db *PostgreSQLDB) UpdateProcessorInPipelineInDB(processor model.PipelineProcessor) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"UPDATE PipelineProcessor SET type = $1, config = $2 WHERE id = $3 AND pipelineid = $4",
+		processor.Type, processor.Config, processor.ID, processor.PipelineID)
+	return err
+}
+
+func (db *PostgreSQLDB) DeleteProcessorFromPipelineInDB(processorID model.ID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM PipelineProcessor WHERE id = $1",
+		processorID)
+	return err
+}
+
+/*
+******************************************************
+
 	Mappings
 
 *******************************************************
@@ -377,6 +455,61 @@ func (db *PostgreSQLDB) DeleteMappingsFromDB() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := db.pool.Exec(ctx,
-		"DELETE FROM Mapping")
+		"DELETE FROM Mapping WHERE true")
 	return err
+}
+
+/*
+******************************************************
+
+	Mapping Types
+
+******************************************************
+*/
+
+func (db *PostgreSQLDB) GetMappingTypesFromDB() ([]model.MappingType, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := db.pool.Query(ctx, `
+		SELECT id, typename, displayname
+		FROM mappingtype
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var types []model.MappingType
+
+	for rows.Next() {
+		var t model.MappingType
+
+		err := rows.Scan(&t.ID, &t.TypeName, &t.DisplayName)
+		if err != nil {
+			return nil, err
+		}
+
+		types = append(types, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return types, nil
+}
+
+func (db *PostgreSQLDB) IsValidMappingType(dataType string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var id model.ID
+	err := db.pool.QueryRow(ctx,
+		"SELECT id FROM MappingType WHERE typename = $1",
+		dataType).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

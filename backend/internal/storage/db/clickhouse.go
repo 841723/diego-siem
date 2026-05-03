@@ -142,10 +142,7 @@ func (db *ClickHouseDB) AddColumnToLogsInDB(columnname string, datatype string) 
 	if !isValidClickHouseColumnName(columnname) {
 		return fmt.Errorf("invalid column name: %s", columnname)
 	}
-
-	if !isValidClickHouseDataType(datatype) {
-		return fmt.Errorf("invalid data type: %s", datatype)
-	}
+	
 	query := fmt.Sprintf("ALTER TABLE logs ADD COLUMN IF NOT EXISTS %s %s", columnname, datatype)
 
 	err := db.conn.Exec(ctx, query)

@@ -121,4 +121,7 @@ func PipelinesRegisterRoutes(r *gin.Engine, storage *storage.Storage) {
 	pipelinesGroup.PUT("/:id", handler.UpdatePipeline)
 	pipelinesGroup.DELETE("", handler.ClearPipelines)
 	pipelinesGroup.DELETE("/:id", handler.ClearPipelineByID)
+
+	processorsGroup := pipelinesGroup.Group("/:id/processors")
+	ProcessorsRegisterRoutes(r, processorsGroup, storage)
 }

@@ -18,9 +18,8 @@ func NewMappingHandler(storage *storage.Storage) *MappingHandler {
 }
 
 func (h *MappingHandler) SetMapping(c *gin.Context) {
-	var req struct {
-		Mapping []model.Mapping
-	}
+	var req []model.Mapping
+
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -32,7 +31,7 @@ func (h *MappingHandler) SetMapping(c *gin.Context) {
 		return
 	}
 
-	for _, m := range req.Mapping {
+	for _, m := range req {
 		err := h.storage.AddMapping(m)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -55,10 +54,24 @@ func (h *MappingHandler) GetMappings(c *gin.Context) {
 	c.JSON(http.StatusOK, mappings)
 }
 
+func (h *MappingHandler) GetMappingTypes(c *gin.Context) {
+	types, err := h.storage.GetMappingTypes()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if len(types) == 0 {
+		types = []model.MappingType{}
+	}
+	c.JSON(http.StatusOK, types)
+}
+
 func MappingRegisterRoutes(r *gin.Engine, storage *storage.Storage) {
 	handler := NewMappingHandler(storage)
 	mappingGroup := r.Group("/mappings")
 
 	mappingGroup.POST("", handler.SetMapping)
 	mappingGroup.GET("", handler.GetMappings)
+
+	mappingGroup.GET("/types", handler.GetMappingTypes)
 }

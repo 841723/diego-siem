@@ -59,16 +59,17 @@ export type PipelineProcessorDraft = {
 
 /**
  * A single field in the global mapping schema.
- * Matches the backend Mapping model: { field_name, field_type_id, default_value }
+ * Matches the backend Mapping model: { fieldname, fieldtypeid, default_value }
  */
 export type MappingField = {
-    field_name: string;
-    field_type_id: string;
-    default_value: string;
+    fieldname: string;
+    fieldtypeid: string;
+    defaultvalue: string;
 };
 
-/** A field type returned by GET /mapping-types */
+/** A field type returned by GET /mappings/types */
 export type MappingType = {
     id: string;
-    type_name: string;
+    typename: string;
+    displayname: string;
 };

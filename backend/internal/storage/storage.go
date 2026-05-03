@@ -86,6 +86,9 @@ func (s *Storage) DeleteSourceByID(sourceID model.ID) error {
 }
 
 func (s *Storage) AddColumnToLogs(columnName, dataType string) error {
+	if ok, err := s.postgres.IsValidMappingType(dataType); !ok {
+		return fmt.Errorf("invalid mapping type: %w", err)
+	}
 	return s.clickhouse.AddColumnToLogsInDB(columnName, dataType)
 }
 
@@ -135,6 +138,22 @@ func (s *Storage) DeletePipelineByID(pipelineID model.ID) error {
 *********************************************************
 */
 
+func (s *Storage) AddProcessorToPipeline(processor model.PipelineProcessor) (model.ID, error) {
+	return s.postgres.AddProcessorToPipelineInDB(processor)
+}
+
+func (s *Storage) GetProcessorsFromPipeline(pipelineID model.ID) ([]model.PipelineProcessor, error) {
+	return s.postgres.GetProcessorsFromPipelineInDB(pipelineID)
+}
+
+func (s *Storage) UpdateProcessorInPipeline(processor model.PipelineProcessor) error {
+	return s.postgres.UpdateProcessorInPipelineInDB(processor)
+}
+
+func (s *Storage) DeleteProcessorFromPipeline(processorID model.ID) error {
+	return s.postgres.DeleteProcessorFromPipelineInDB(processorID)
+}
+
 
 /**********************************************************
 
@@ -153,3 +172,16 @@ func (s *Storage) GetMappings() ([]model.Mapping, error) {
 func (s *Storage) DeleteMappings() error {
 	return s.postgres.DeleteMappingsFromDB()
 }
+
+/*
+**********************************************************
+
+	Mapping Types
+
+*********************************************************
+*/
+
+func (s *Storage) GetMappingTypes() ([]model.MappingType, error) {
+	return s.postgres.GetMappingTypesFromDB()
+}
+

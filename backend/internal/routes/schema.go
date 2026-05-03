@@ -48,7 +48,7 @@ func (h *SchemaHandler) RemoveColumn(c *gin.Context) {
 func SchemaRegisterRoutes(r *gin.Engine, storage *storage.Storage) {
 	handler := NewSchemaHandler(storage)
 	schemaGroup := r.Group("/schema")
-	
+
 	schemaGroup.POST("/add-column", handler.AddColumn)
 	schemaGroup.POST("/remove-column", handler.RemoveColumn)
 }
