@@ -1,6 +1,6 @@
 export type LogEntry = {
     _row_key: string;
-    timestamp: number;
+    timestamp: string;
     sourceid: string;
     data: Record<string, unknown>;
 };

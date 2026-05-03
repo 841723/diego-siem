@@ -29,9 +29,10 @@ export function toTimestampMs(value: number): number {
     return value > TIMESTAMP_MS_THRESHOLD ? value : value * 1000;
 }
 
-export function formatTimestamp(value: number): string {
+export function formatTimestamp(value: string): string {
     // dd/MM/yyyy HH:mm:ss
-    return new Date(toTimestampMs(value)).toLocaleDateString("es-ES", {
+
+    return new Date(value).toLocaleDateString("es-ES", {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
@@ -177,10 +178,10 @@ export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
         return logs.filter((log) => {
             if (sourceId !== null && log.sourceid !== sourceId) return false;
 
-            if (window.ms !== null) {
-                if (toTimestampMs(log.timestamp) < now - window.ms)
-                    return false;
-            }
+            // if (window.ms !== null) {
+            //     if (toTimestampMs(log.timestamp) < now - window.ms)
+            //         return false;
+            // }
 
             if (!filterText.trim()) return true;
             const needle = filterText.trim().toLowerCase();
