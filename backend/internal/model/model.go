@@ -20,6 +20,30 @@ type SourceConfig struct {
 	PipelineID ID     `json:"pipelineid"` // pipeline to process the log
 }
 
+type Pipeline struct {
+	ID          ID     `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type PipelineProcessor struct {
+	ID         ID     `json:"id"`
+	PipelineID ID     `json:"pipelineid"`
+	Type       string `json:"type"`   // e.g., "filter", "enrich", "transform"
+	Config     string `json:"config"` // JSON or other format for processor configuration
+}
+
+type MappingType struct {
+	ID       ID     `json:"id"`
+	TypeName string `json:"type_name"` // e.g., "string", "integer", "timestamp"
+}
+
+type Mapping struct {
+	FieldName    string `json:"field_name"`
+	FieldTypeID  ID     `json:"field_type_id"`
+	DefaultValue string `json:"default_value"`
+}
+
 /*
 **************************************************************
 

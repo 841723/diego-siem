@@ -19,6 +19,12 @@ func NewStorage() *Storage {
 	}
 }
 
+/**********************************************************
+
+						Logs
+
+**********************************************************/
+
 func (s *Storage) StoreLog(log model.Log) error {
 	return s.clickhouse.LogToDB(log)
 }
@@ -40,6 +46,12 @@ func (s *Storage) CountLogs(params model.GetLogsParams) (int, error) {
 func (s *Storage) DeleteLogs() error {
 	return s.clickhouse.DeleteLogsFromDB()
 }
+
+/**********************************************************
+
+						Sources
+
+**********************************************************/
 
 func (s *Storage) GetSources() ([]model.SourceConfig, error) {
 	return s.postgres.GetSourcesFromDB()
@@ -79,4 +91,65 @@ func (s *Storage) AddColumnToLogs(columnName, dataType string) error {
 
 func (s *Storage) RemoveColumnFromLogs(columnName string) error {
 	return s.clickhouse.RemoveColumnFromLogsInDB(columnName)
+}
+
+/*
+*********************************************************
+
+	Pipelines
+
+*********************************************************
+*/
+func (s *Storage) AddPipeline(pipeline model.Pipeline) (model.ID, error) {
+	return s.postgres.AddPipelineToDB(pipeline)
+}
+
+func (s *Storage) GetPipelines() ([]model.Pipeline, error) {
+	return s.postgres.GetPipelinesFromDB()
+}
+
+func (s *Storage) GetPipelineByID(id model.ID) (*model.Pipeline, error) {
+	return s.postgres.GetPipelineByIDFromDB(id)
+}
+
+func (s *Storage) UpdatePipeline(pipeline model.Pipeline) error {
+	return s.postgres.UpdatePipelineInDB(pipeline)
+}
+
+func (s *Storage) DeletePipeline(pipelineID model.ID) error {
+	return s.postgres.DeletePipelineFromDB(pipelineID)
+}
+
+func (s *Storage) ClearPipelines() error {
+	return s.postgres.ClearPipelinesFromDB()
+}
+
+func (s *Storage) DeletePipelineByID(pipelineID model.ID) error {
+	return s.postgres.DeletePipelineByIDFromDB(pipelineID)
+}
+
+/*********************************************************
+
+	Processors
+
+*********************************************************
+*/
+
+
+/**********************************************************
+
+	Mappings
+
+*********************************************************
+*/
+func (s *Storage) AddMapping(mapping model.Mapping) error {
+	return s.postgres.AddMappingToDB(mapping)
+}
+
+func (s *Storage) GetMappings() ([]model.Mapping, error) {
+	return s.postgres.GetMappingsFromDB()
+}
+
+func (s *Storage) DeleteMappings() error {
+	return s.postgres.DeleteMappingsFromDB()
 }

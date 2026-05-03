@@ -204,3 +204,179 @@ func (db *PostgreSQLDB) DeleteSourceByIDFromDB(sourceID model.ID) error {
 		sourceID)
 	return err
 }
+
+/*
+*******************************************************
+
+	Pipelines
+
+*******************************************************
+*/
+func (db *PostgreSQLDB) AddPipelineToDB(pipeline model.Pipeline) (model.ID, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var id model.ID
+	err := db.pool.QueryRow(ctx,
+		"INSERT INTO Pipeline (ID, name, description) VALUES ($1, $2, $3) RETURNING id",
+		pipeline.ID, pipeline.Name, pipeline.Description).Scan(&id)
+	if err != nil {
+		return model.GenerateErrorUUID(), err
+	}
+	return id, nil
+}
+
+func (db *PostgreSQLDB) GetPipelinesFromDB() ([]model.Pipeline, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// Implement logic to retrieve pipelines from PostgreSQL
+	rows, err := db.pool.Query(ctx, `
+		SELECT id, name, description
+		FROM pipeline
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var pipelines []model.Pipeline
+
+	for rows.Next() {
+		var p model.Pipeline
+
+		err := rows.Scan(
+			&p.ID,
+			&p.Name,
+			&p.Description,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		pipelines = append(pipelines, p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return pipelines, nil
+}
+
+func (db *PostgreSQLDB) GetPipelineByIDFromDB(id model.ID) (*model.Pipeline, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var p model.Pipeline
+
+	err := db.pool.QueryRow(ctx, `
+		SELECT id, name, description
+		FROM pipeline
+		WHERE id = $1
+	`, id).Scan(
+		&p.ID,
+		&p.Name,
+		&p.Description,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &p, nil
+}
+
+func (db *PostgreSQLDB) UpdatePipelineInDB(pipeline model.Pipeline) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"UPDATE Pipeline SET name = $1, description = $2 WHERE id = $3",
+		pipeline.Name, pipeline.Description, pipeline.ID)
+	return err
+}
+
+func (db *PostgreSQLDB) DeletePipelineFromDB(pipelineID model.ID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM Pipeline WHERE id = $1",
+		pipelineID)
+	return err
+}
+
+func (db *PostgreSQLDB) ClearPipelinesFromDB() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM Pipeline")
+	return err
+}
+
+func (db *PostgreSQLDB) DeletePipelineByIDFromDB(pipelineID model.ID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM Pipeline WHERE id = $1",
+		pipelineID)
+	return err
+}
+
+/*
+******************************************************
+
+	Mappings
+
+*******************************************************
+*/
+func (db *PostgreSQLDB) AddMappingToDB(mapping model.Mapping) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := db.pool.Exec(ctx,
+		"INSERT INTO Mapping (FieldName, FieldTypeID, DefaultValue) VALUES ($1, $2, $3)",
+		mapping.FieldName, mapping.FieldTypeID, mapping.DefaultValue)
+	return err
+}
+
+func (db *PostgreSQLDB) GetMappingsFromDB() ([]model.Mapping, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := db.pool.Query(ctx, `
+		SELECT fieldname, fieldtypeid, defaultvalue
+		FROM mapping
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var mappings []model.Mapping
+
+	for rows.Next() {
+		var m model.Mapping
+
+		err := rows.Scan(
+			&m.FieldName,
+			&m.FieldTypeID,
+			&m.DefaultValue,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		mappings = append(mappings, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return mappings, nil
+}
+
+func (db *PostgreSQLDB) DeleteMappingsFromDB() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM Mapping")
+	return err
+}

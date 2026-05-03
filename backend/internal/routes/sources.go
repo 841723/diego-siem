@@ -60,6 +60,11 @@ func (h *SourceHandler) GetSourceByID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	if source == nil {
+		c.JSON(http.StatusNoContent, gin.H{"error": "Source not found"})
+		return
+	}
 	c.JSON(http.StatusOK, source)
 }
 
