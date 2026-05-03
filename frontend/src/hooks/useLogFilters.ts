@@ -48,7 +48,7 @@ export function formatCellValue(value: unknown): string {
 }
 
 export type LogFiltersState = {
-    sourceId: number | null;
+    sourceId: string | null;
     timeWindow: string;
     filterText: string;
     columns: string[];
@@ -74,11 +74,10 @@ export type LogFiltersState = {
 export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const parseSourceId = (): number | null => {
+    const parseSourceId = (): string | null => {
         const raw = searchParams.get("source");
-        if (raw === null) return null;
-        const n = parseInt(raw, 10);
-        return isNaN(n) ? null : n;
+        if (!raw) return null;
+        return raw;
     };
 
     const parseColumns = (): string[] => {

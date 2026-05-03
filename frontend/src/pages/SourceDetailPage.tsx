@@ -18,7 +18,7 @@ export default function SourceDetailPage() {
         if (!id) return;
         let cancelled = false;
         setLoading(true);
-        getSource(Number(id))
+        getSource(id)
             .then((src) => { if (!cancelled) setSource(src); })
             .catch((err: Error) => { if (!cancelled) setError(err.message || "Error cargando fuente"); })
             .finally(() => { if (!cancelled) setLoading(false); });
@@ -28,7 +28,7 @@ export default function SourceDetailPage() {
     async function handleDelete() {
         if (!id) return;
         try {
-            await deleteSource(Number(id));
+            await deleteSource(id);
             navigate("/sources");
         } catch (err) {
             setError((err as Error).message || "Error al eliminar fuente");

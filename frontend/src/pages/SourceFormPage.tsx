@@ -11,7 +11,7 @@ const DEFAULT_FORM: FormState = {
     port: 9001,
     protocol: "udp",
     parser: "syslog",
-    pipelineid: 0,
+    pipelineid: "0",
 };
 
 export default function SourceFormPage() {
@@ -31,7 +31,7 @@ export default function SourceFormPage() {
         if (!isEdit || !id) return;
         let cancelled = false;
         setLoadingItem(true);
-        getSource(Number(id))
+        getSource(id)
             .then((src) => {
                 if (!cancelled) {
                     const { id: _id, ...rest } = src;
@@ -53,7 +53,7 @@ export default function SourceFormPage() {
         setSubmitting(true);
         try {
             if (isEdit && id) {
-                await updateSource(Number(id), form);
+                await updateSource(id, form);
             } else {
                 await createSource(form);
             }
@@ -147,7 +147,7 @@ export default function SourceFormPage() {
                                 min={0}
                                 className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent"
                                 value={form.pipelineid}
-                                onChange={(e) => setForm((f) => ({ ...f, pipelineid: Number(e.target.value) }))}
+                                onChange={(e) => setForm((f) => ({ ...f, pipelineid: String(e.target.value) }))}
                             />
                         </div>
 

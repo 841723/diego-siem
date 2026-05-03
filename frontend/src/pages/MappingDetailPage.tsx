@@ -18,7 +18,7 @@ export default function MappingDetailPage() {
         if (!id) return;
         let cancelled = false;
         setLoading(true);
-        getMapping(Number(id))
+        getMapping(id)
             .then((m) => { if (!cancelled) setMapping(m); })
             .catch((err: Error) => { if (!cancelled) setError(err.message || "Error cargando mapping"); })
             .finally(() => { if (!cancelled) setLoading(false); });
@@ -28,7 +28,7 @@ export default function MappingDetailPage() {
     async function handleDelete() {
         if (!id) return;
         try {
-            await deleteMapping(Number(id));
+            await deleteMapping(id);
             navigate("/mappings");
         } catch (err) {
             setError((err as Error).message || "Error al eliminar mapping");

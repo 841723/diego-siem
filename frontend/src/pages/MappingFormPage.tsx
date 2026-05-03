@@ -27,7 +27,7 @@ export default function MappingFormPage() {
         if (!isEdit || !id) return;
         let cancelled = false;
         setLoadingItem(true);
-        getMapping(Number(id))
+        getMapping(id)
             .then((m) => {
                 if (!cancelled) {
                     setName(m.name);
@@ -66,7 +66,7 @@ export default function MappingFormPage() {
         setSubmitting(true);
         try {
             if (isEdit && id) {
-                await updateMapping(Number(id), { name, fields: validFields });
+                await updateMapping(id, { name, fields: validFields });
             } else {
                 await createMapping({ name, fields: validFields });
             }

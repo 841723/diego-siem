@@ -18,7 +18,7 @@ export default function PipelineDetailPage() {
         if (!id) return;
         let cancelled = false;
         setLoading(true);
-        getPipeline(Number(id))
+        getPipeline(id)
             .then((pl) => { if (!cancelled) setPipeline(pl); })
             .catch((err: Error) => { if (!cancelled) setError(err.message || "Error cargando pipeline"); })
             .finally(() => { if (!cancelled) setLoading(false); });
@@ -28,7 +28,7 @@ export default function PipelineDetailPage() {
     async function handleDelete() {
         if (!id) return;
         try {
-            await deletePipeline(Number(id));
+            await deletePipeline(id);
             navigate("/pipelines");
         } catch (err) {
             setError((err as Error).message || "Error al eliminar pipeline");

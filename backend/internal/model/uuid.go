@@ -4,7 +4,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type ID uuid.UUID
+type ID = uuid.UUID
 
 func GenerateUUID() ID {
 	return ID(uuid.New())
@@ -21,10 +21,6 @@ func ParseUUID(s string) ID {
 		panic(err)
 	}
 	return ID(u)
-}
-
-func (id ID) String() string {
-	return uuid.UUID(id).String()
 }
 
 // when created with GenerateErrorUUID, it will return "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"

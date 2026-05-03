@@ -1,17 +1,17 @@
 export type LogEntry = {
     _row_key: string;
     timestamp: number;
-    sourceid: number;
+    sourceid: string;
     data: Record<string, unknown>;
 };
 
 export type SourceConfig = {
-    id: number;
+    id: string;
     name: string;
     port: number;
     protocol: string;
     parser: string;
-    pipelineid: number;
+    pipelineid: string;
 };
 
 export type TimeWindow = {
@@ -21,7 +21,7 @@ export type TimeWindow = {
 };
 
 export type LogFilters = {
-    sourceId: number | null;
+    sourceId: string | null;
     timeWindow: string;
     filterText: string;
     columns: string[];

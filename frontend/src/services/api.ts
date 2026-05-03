@@ -13,12 +13,12 @@ export async function getSources(): Promise<SourceConfig[]> {
     return Array.isArray(payload) ? payload : [];
 }
 
-export async function getSource(id: number): Promise<SourceConfig> {
+export async function getSource(id: string): Promise<SourceConfig> {
     return request<SourceConfig>(`/sources/${id}`);
 }
 
 export async function createSource(
-    source: Omit<SourceConfig, "id"> & { id?: number },
+    source: Omit<SourceConfig, "id"> & { id?: string },
 ): Promise<void> {
     await request<void>("/sources", {
         method: "POST",
@@ -28,7 +28,7 @@ export async function createSource(
 }
 
 export async function updateSource(
-    id: number,
+    id: string,
     source: Omit<SourceConfig, "id">,
 ): Promise<void> {
     await request<void>(`/sources/${id}`, {
@@ -38,7 +38,7 @@ export async function updateSource(
     });
 }
 
-export async function deleteSource(id: number): Promise<void> {
+export async function deleteSource(id: string): Promise<void> {
     await request<void>(`/sources/${id}`, { method: "DELETE" });
 }
 
@@ -64,7 +64,7 @@ function normalizeLogs(payload: unknown): LogEntry[] {
 }
 
 export async function getLogs(
-    sourceId: number,
+    sourceId: string,
     timeWindow: string,
     from: number,
     size: number,
@@ -89,7 +89,7 @@ export async function getMappings(): Promise<Mapping[]> {
     return Array.isArray(payload) ? payload : [];
 }
 
-export async function getMapping(id: number): Promise<Mapping> {
+export async function getMapping(id: string): Promise<Mapping> {
     return request<Mapping>(`/mappings/${id}`);
 }
 
@@ -104,7 +104,7 @@ export async function createMapping(
 }
 
 export async function updateMapping(
-    id: number,
+    id: string,
     mapping: Omit<Mapping, "id">,
 ): Promise<void> {
     await request<void>(`/mappings/${id}`, {
@@ -114,11 +114,11 @@ export async function updateMapping(
     });
 }
 
-export async function deleteMapping(id: number): Promise<void> {
+export async function deleteMapping(id: string): Promise<void> {
     await request<void>(`/mappings/${id}`, { method: "DELETE" });
 }
 
-export async function duplicateMapping(id: number): Promise<void> {
+export async function duplicateMapping(id: string): Promise<void> {
     await request<void>(`/mappings/${id}/duplicate`, { method: "POST" });
 }
 
@@ -129,7 +129,7 @@ export async function getPipelines(): Promise<Pipeline[]> {
     return Array.isArray(payload) ? payload : [];
 }
 
-export async function getPipeline(id: number): Promise<Pipeline> {
+export async function getPipeline(id: string): Promise<Pipeline> {
     return request<Pipeline>(`/pipelines/${id}`);
 }
 
@@ -144,7 +144,7 @@ export async function createPipeline(
 }
 
 export async function updatePipeline(
-    id: number,
+    id: string,
     pipeline: Omit<Pipeline, "id">,
 ): Promise<void> {
     await request<void>(`/pipelines/${id}`, {
@@ -154,10 +154,10 @@ export async function updatePipeline(
     });
 }
 
-export async function deletePipeline(id: number): Promise<void> {
+export async function deletePipeline(id: string): Promise<void> {
     await request<void>(`/pipelines/${id}`, { method: "DELETE" });
 }
 
-export async function duplicatePipeline(id: number): Promise<void> {
+export async function duplicatePipeline(id: string): Promise<void> {
     await request<void>(`/pipelines/${id}/duplicate`, { method: "POST" });
 }

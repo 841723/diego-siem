@@ -44,7 +44,7 @@ export default function PipelineFormPage() {
         if (!isEdit || !id) return;
         let cancelled = false;
         setLoadingItem(true);
-        getPipeline(Number(id))
+        getPipeline(id)
             .then((pl) => {
                 if (!cancelled) {
                     setName(pl.name);
@@ -98,7 +98,7 @@ export default function PipelineFormPage() {
         setSubmitting(true);
         try {
             if (isEdit && id) {
-                await updatePipeline(Number(id), { name, processors: parsedProcessors });
+                await updatePipeline(id, { name, processors: parsedProcessors });
             } else {
                 await createPipeline({ name, processors: parsedProcessors });
             }
