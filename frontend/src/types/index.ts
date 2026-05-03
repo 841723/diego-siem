@@ -29,28 +29,46 @@ export type LogFilters = {
     pageSize: number;
 };
 
-export type FieldType = "integer" | "decimal" | "string" | "boolean" | "date" | "ip";
+// ── Pipelines ────────────────────────────────────────────────────────────────
 
-export type MappingField = {
+/** Pipeline as returned by GET /pipelines and GET /pipelines/:id */
+export type Pipeline = {
+    id: string;
     name: string;
-    type: FieldType;
+    description: string;
 };
 
-export type Mapping = {
-    id: number;
+/**
+ * A processor type definition returned by GET /processors.
+ * `config` maps each config field name to its value type ("string", "number", "boolean").
+ */
+export type ProcessorDefinition = {
+    id: string;
     name: string;
-    fields: MappingField[];
+    description: string;
+    config: Record<string, string>;
 };
 
-export type ProcessorType = "set" | "drop" | "copy" | "call_pipeline" | "rename" | "lowercase" | "uppercase";
-
-export type Processor = {
-    type: ProcessorType;
+/** Client-side draft of a single processor inside a pipeline form */
+export type PipelineProcessorDraft = {
+    type: string;
     config: Record<string, unknown>;
 };
 
-export type Pipeline = {
-    id: number;
-    name: string;
-    processors: Processor[];
+// ── Mapping (global) ─────────────────────────────────────────────────────────
+
+/**
+ * A single field in the global mapping schema.
+ * Matches the backend Mapping model: { field_name, field_type_id, default_value }
+ */
+export type MappingField = {
+    field_name: string;
+    field_type_id: string;
+    default_value: string;
+};
+
+/** A field type returned by GET /mapping-types */
+export type MappingType = {
+    id: string;
+    type_name: string;
 };

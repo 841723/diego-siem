@@ -11,7 +11,7 @@ const DEFAULT_FORM: FormState = {
     port: 9001,
     protocol: "udp",
     parser: "syslog",
-    pipelineid: "0",
+    pipelineid: "",
 };
 
 export default function SourceFormPage() {
@@ -143,11 +143,11 @@ export default function SourceFormPage() {
                                 Pipeline ID
                             </label>
                             <input
-                                type="number"
-                                min={0}
+                                type="text"
                                 className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent"
                                 value={form.pipelineid}
-                                onChange={(e) => setForm((f) => ({ ...f, pipelineid: String(e.target.value) }))}
+                                onChange={(e) => setForm((f) => ({ ...f, pipelineid: e.target.value }))}
+                                placeholder="UUID del pipeline (opcional)"
                             />
                         </div>
 

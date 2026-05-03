@@ -41,7 +41,7 @@ export default function PipelineDetailPage() {
         navigate("/pipelines/new", {
             state: {
                 name: `${pipeline.name} (copia)`,
-                processors: pipeline.processors,
+                description: pipeline.description,
             },
         });
     }
@@ -97,9 +97,9 @@ export default function PipelineDetailPage() {
                         <dl className="overflow-hidden rounded-xl border border-border">
                             {(
                                 [
-                                    ["ID", String(pipeline.id)],
+                                    ["ID", pipeline.id],
                                     ["Nombre", pipeline.name],
-                                    ["Nº procesadores", String(pipeline.processors.length)],
+                                    ["Descripción", pipeline.description || "—"],
                                 ] as [string, string][]
                             ).map(([label, value], i) => (
                                 <div
@@ -109,38 +109,19 @@ export default function PipelineDetailPage() {
                                     <dt className="w-36 shrink-0 text-xs font-semibold uppercase tracking-wider text-muted">
                                         {label}
                                     </dt>
-                                    <dd className="font-mono text-sm text-text">{value}</dd>
+                                    <dd className={`text-sm text-text ${label === "ID" ? "font-mono" : ""}`}>
+                                        {value}
+                                    </dd>
                                 </div>
                             ))}
                         </dl>
 
-                        {/* Processors list */}
-                        <div>
-                            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted">
-                                Procesadores ({pipeline.processors.length})
-                            </h2>
-                            <div className="space-y-2">
-                                {pipeline.processors.map((proc, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="flex items-start gap-3 rounded-xl border border-border bg-surface p-4"
-                                    >
-                                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-xs text-muted">
-                                            {idx + 1}
-                                        </span>
-                                        <div className="flex-1">
-                                            <span className="rounded bg-secondary px-2 py-0.5 font-mono text-xs text-muted">
-                                                {proc.type}
-                                            </span>
-                                            {Object.keys(proc.config).length > 0 && (
-                                                <pre className="mt-2 rounded bg-secondary/50 p-2 font-mono text-xs text-text">
-                                                    {JSON.stringify(proc.config, null, 2)}
-                                                </pre>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                        {/* Processors placeholder */}
+                        <div className="rounded-xl border border-border/50 bg-surface p-4">
+                            <p className="text-xs text-muted">
+                                Los procesadores del pipeline se mostrarán aquí cuando el endpoint{" "}
+                                <code className="font-mono">GET /pipelines/:id/processors</code> esté disponible.
+                            </p>
                         </div>
                     </div>
                 ) : null}
