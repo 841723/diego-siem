@@ -64,7 +64,7 @@ INSERT INTO Processor (ID, Name, Description, Config) VALUES
  '{"destination_field": "string", "value": "string"}');
 
 INSERT INTO Processor (ID, Name, Description, Config) VALUES 
-('186e047b-6327-4f35-bb91-7cd8e77ac69f', 'Drop', 'Drops a field from the log entry', 
+('186e047b-6327-4f35-bb91-7cd8e77ac69f', 'Delete', 'Deletes a field from the log entry', 
  '{"field": "string"}');
 
 INSERT INTO Processor (ID, Name, Description, Config) VALUES 
@@ -90,6 +90,22 @@ INSERT INTO Processor (ID, Name, Description, Config) VALUES
 INSERT INTO Processor (ID, Name, Description, Config) VALUES 
 ('442e331c-4b66-44b2-8292-1bc02f5e835d', 'Concat', 'Concatenates values from multiple fields', 
  '{"fields": ["string"], "destination_field": "string", "delimiter": "string"}');
+
+INSERT INTO Processor (ID, Name, Description, Config) VALUES 
+('d1e8c9a2-5b3f-4c6e-9f8a-7b2d3e4f5a6b', 'Regex Extract', 'Extracts a value from a field using a regular expression', 
+ '{"field": "string", "regex": "string", "destination_field": "string"}');
+
+INSERT INTO Processor (ID, Name, Description, Config) VALUES 
+('a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d', 'GeoIP Enrich', 'Enriches log entry with GeoIP information based on an IP field', 
+ '{"ip_field": "string", "destination_field": "string"}');
+
+ INSERT INTO Processor (ID, Name, Description, Config) VALUES 
+('e7f8a9b0-c1d2-3e4f-5a6b-7c8d9e0f1a2b', 'Date Parse', 'Parses a date field into a standardized format', 
+ '{"field": "string", "input_format": "string", "output_format": "string", "destination_field": "string"}');
+
+ INSERT INTO Processor (ID, Name, Description, Config) VALUES 
+('9f0a1b2c-3d4e-5f6a-7b8c-9d0e1f2a3b4c', 'Drop', 'Drops the log entry if a field matches a certain value', 
+ '{"field": "string", "value": "string"}');
 
 
 INSERT INTO Pipeline (ID, Name, Description) VALUES 

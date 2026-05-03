@@ -1,15 +1,18 @@
 package model
 
 import (
+	"encoding/json"
 	"time"
 )
 
 type Log struct {
-	ID        ID                     `json:"id"`
-	Timestamp time.Time              `json:"timestamp"`
-	SourceID  ID                     `json:"sourceid"`
-	Data      map[string]interface{} `json:"data"`
+	ID        ID        `json:"id"`
+	Timestamp time.Time `json:"timestamp"`
+	SourceID  ID        `json:"sourceid"`
+	Data      LogData   `json:"data"`
 }
+
+type LogData = map[string]interface{}
 
 type SourceConfig struct {
 	ID         ID     `json:"id"`
@@ -26,11 +29,13 @@ type Pipeline struct {
 	Description string `json:"description"`
 }
 
+type PipelineProcessorConfig = json.RawMessage
+
 type PipelineProcessor struct {
-	ID         ID     `json:"id"`
-	PipelineID ID     `json:"pipelineid"`
-	Type       string `json:"type"`   // e.g., "filter", "enrich", "transform"
-	Config     string `json:"config"` // JSON or other format for processor configuration
+	ID         ID                      `json:"id"`
+	PipelineID ID                      `json:"pipelineid"`
+	Type       string                  `json:"type"`   // e.g., "filter", "enrich", "transform"
+	Config     PipelineProcessorConfig `json:"config"` // JSON or other format for processor configuration
 }
 
 type MappingType struct {

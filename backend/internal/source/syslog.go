@@ -95,7 +95,7 @@ func parseSyslog(raw string, source model.ID) (*model.Log, error) {
 	}
 
 	return &model.Log{
-		ID: model.GenerateUUID(),
+		ID:        model.GenerateUUID(),
 		Timestamp: ts,
 		SourceID:  source,
 		Data:      payload,
