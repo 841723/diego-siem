@@ -30,12 +30,7 @@ func (s *Storage) StoreLog(log model.Log) error {
 }
 
 func (s *Storage) GetLogs(params model.GetLogsParams) ([]model.Log, error) {
-	var err error
-	// params.TimestampFrom, params.TimestampTo, err = lib.ClickHouse_FormatTimeWindow(params.TimeWindow)
 	fmt.Printf("Received GetLogs request with TimeWindow: %s\n", params.TimeWindow)
-	if err != nil {
-		return nil, fmt.Errorf("failed to format time window: %w", err)
-	}
 	return s.clickhouse.GetLogsFromDB(params)
 }
 
@@ -154,8 +149,8 @@ func (s *Storage) DeleteProcessorFromPipeline(processorID model.ID) error {
 	return s.postgres.DeleteProcessorFromPipelineInDB(processorID)
 }
 
-
-/**********************************************************
+/*
+*********************************************************
 
 	Mappings
 
@@ -184,4 +179,3 @@ func (s *Storage) DeleteMappings() error {
 func (s *Storage) GetMappingTypes() ([]model.MappingType, error) {
 	return s.postgres.GetMappingTypesFromDB()
 }
-
