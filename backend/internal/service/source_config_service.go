@@ -104,7 +104,7 @@ func (s *SourceManager) AddSource(cfg model.SourceConfig) (*model.SourceConfig, 
 	}
 
 	IDToAdd := model.GenerateUUID()
-	
+
 	cfg.ID = IDToAdd
 	ID, err := s.storage.AddSource(cfg)
 	if err != nil {

@@ -75,7 +75,7 @@ func (db *ClickHouseDB) LogToDB(log model.Log) error {
 	}
 
 	ctx := context.Background()
-	err := db.conn.Exec(ctx, "INSERT INTO logs (ID, timestamp, sourceid, data) VALUES (?, ?, ?, ?)", log.ID, log.Timestamp, log.SourceID, data)
+	err := db.conn.Exec(ctx, "INSERT INTO logs (logid, timestamp, sourceid, data) VALUES (?, ?, ?, ?)", log.ID, log.Timestamp, log.SourceID, data)
 	if err != nil {
 		return fmt.Errorf("failed to insert log: %w", err)
 	}
@@ -84,7 +84,7 @@ func (db *ClickHouseDB) LogToDB(log model.Log) error {
 
 func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsParams) ([]model.Log, error) {
 	ctx := context.Background()
-	rows, err := db.conn.Query(ctx, "SELECT ID, timestamp, sourceid, data FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?", params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
+	rows, err := db.conn.Query(ctx, "SELECT logid, timestamp, sourceid, data FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?", params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logs: %w", err)
 	}
