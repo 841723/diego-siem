@@ -35,7 +35,7 @@ export default function SourcesPage() {
     }
 
     const tableRows = sources
-        .sort((a, b) => a.id - b.id)
+        .sort((a, b) => a.id.localeCompare(b.id))
         .map((src) => [
             // <span className="font-mono text-xs text-muted">{src.id}</span>,
             <button

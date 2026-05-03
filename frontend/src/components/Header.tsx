@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 const NAV_ITEMS = [
     { to: "/logs", label: "Logs" },
     { to: "/sources", label: "Fuentes" },
-    { to: "/mappings", label: "Mappings" },
+    { to: "/mapping", label: "Mapping" },
     { to: "/pipelines", label: "Pipelines" },
 ];
 

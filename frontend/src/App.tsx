@@ -24,8 +24,10 @@ export default function App() {
                 <Route path="/sources/:id" element={<SourceDetailPage />} />
                 <Route path="/sources/:id/edit" element={<SourceFormPage />} />
 
-                {/* Mappings */}
-                <Route path="/mappings" element={<MappingsPage />} />
+                {/* Global Mapping */}
+                <Route path="/mapping" element={<MappingsPage />} />
+                {/* Legacy redirect: old per-mapping routes → global mapping page */}
+                <Route path="/mappings" element={<Navigate to="/mapping" replace />} />
                 <Route path="/mappings/new" element={<MappingFormPage />} />
                 <Route path="/mappings/:id" element={<MappingDetailPage />} />
                 <Route path="/mappings/:id/edit" element={<MappingFormPage />} />

@@ -27,29 +27,19 @@ export default function PipelinesPage() {
 
     function handleDuplicate(pl: Pipeline) {
         navigate("/pipelines/new", {
-            state: { name: `${pl.name} (copia)`, processors: pl.processors },
+            state: { name: `${pl.name} (copia)`, description: pl.description },
         });
     }
 
     const tableRows = pipelines.map((pl) => [
-        <span className="font-mono text-xs text-muted">{pl.id}</span>,
+        <span className="font-mono text-xs text-muted">{pl.id.slice(0, 8)}…</span>,
         <button
             onClick={() => navigate(`/pipelines/${pl.id}`)}
             className="text-left text-sm text-text hover:underline"
         >
             {pl.name}
         </button>,
-        <div className="flex flex-col gap-1">
-            {pl.processors.map((proc, idx) => (
-                <span
-                    key={idx}
-                    className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-muted"
-                >
-                    {idx + 1}. {proc.type}
-                </span>
-            ))}
-        </div>,
-        <span className="font-mono text-xs text-muted">{pl.processors.length}</span>,
+        <span className="text-xs text-muted line-clamp-2">{pl.description || "—"}</span>,
         <div className="flex gap-1.5">
             <button
                 onClick={() => navigate(`/pipelines/${pl.id}/edit`)}
@@ -100,7 +90,7 @@ export default function PipelinesPage() {
                     <LoadingState message="Cargando pipelines…" />
                 ) : (
                     <DataTable
-                        headers={["ID", "Nombre", "Procesadores", "Nº proc.", "Acciones"]}
+                        headers={["ID", "Nombre", "Descripción", "Acciones"]}
                         rows={tableRows}
                         emptyMessage="No hay pipelines configurados"
                     />

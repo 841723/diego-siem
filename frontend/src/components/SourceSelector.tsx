@@ -2,8 +2,8 @@ import type { SourceConfig } from "../types";
 
 type Props = {
     sources: SourceConfig[];
-    selectedId: number | null;
-    onSelect: (id: number | null) => void;
+    selectedId: string | null;
+    onSelect: (id: string | null) => void;
 };
 
 export default function SourceSelector({
@@ -24,7 +24,7 @@ export default function SourceSelector({
                     value={selectedId ?? ""}
                     onChange={(e) => {
                         const val = e.target.value;
-                        onSelect(val === "" ? null : parseInt(val, 10));
+                        onSelect(val === "" ? null : val);
                     }}
                 >
                     {sources.map((src) => (

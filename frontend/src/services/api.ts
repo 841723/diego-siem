@@ -1,4 +1,4 @@
-import type { LogEntry, Mapping, Pipeline, SourceConfig } from "../types";
+import type { LogEntry, MappingField, MappingType, Pipeline, ProcessorDefinition, SourceConfig } from "../types";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -7,6 +7,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json() as Promise<T>;
 }
+
+// ── Sources ──────────────────────────────────────────────────────────────────
 
 export async function getSources(): Promise<SourceConfig[]> {
     const payload = await request<SourceConfig[]>("/sources");
@@ -46,6 +48,8 @@ export async function deleteSources(): Promise<void> {
     await request<void>("/sources", { method: "DELETE" });
 }
 
+// ── Logs ─────────────────────────────────────────────────────────────────────
+
 function normalizeLogs(payload: unknown): LogEntry[] {
     const raw: Array<Omit<LogEntry, "_row_key">> = Array.isArray(payload)
         ? (payload as Array<Omit<LogEntry, "_row_key">>)
@@ -82,46 +86,6 @@ export async function getLogs(
     return { logs: normalizeLogs(logs), total };
 }
 
-// ── Mappings ─────────────────────────────────────────────────────────────────
-
-export async function getMappings(): Promise<Mapping[]> {
-    const payload = await request<Mapping[]>("/mappings");
-    return Array.isArray(payload) ? payload : [];
-}
-
-export async function getMapping(id: string): Promise<Mapping> {
-    return request<Mapping>(`/mappings/${id}`);
-}
-
-export async function createMapping(
-    mapping: Omit<Mapping, "id">,
-): Promise<void> {
-    await request<void>("/mappings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mapping),
-    });
-}
-
-export async function updateMapping(
-    id: string,
-    mapping: Omit<Mapping, "id">,
-): Promise<void> {
-    await request<void>(`/mappings/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mapping),
-    });
-}
-
-export async function deleteMapping(id: string): Promise<void> {
-    await request<void>(`/mappings/${id}`, { method: "DELETE" });
-}
-
-export async function duplicateMapping(id: string): Promise<void> {
-    await request<void>(`/mappings/${id}/duplicate`, { method: "POST" });
-}
-
 // ── Pipelines ─────────────────────────────────────────────────────────────────
 
 export async function getPipelines(): Promise<Pipeline[]> {
@@ -134,9 +98,9 @@ export async function getPipeline(id: string): Promise<Pipeline> {
 }
 
 export async function createPipeline(
-    pipeline: Omit<Pipeline, "id">,
-): Promise<void> {
-    await request<void>("/pipelines", {
+    pipeline: Pick<Pipeline, "name" | "description">,
+): Promise<Pipeline> {
+    return request<Pipeline>("/pipelines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pipeline),
@@ -145,7 +109,7 @@ export async function createPipeline(
 
 export async function updatePipeline(
     id: string,
-    pipeline: Omit<Pipeline, "id">,
+    pipeline: Pick<Pipeline, "name" | "description">,
 ): Promise<void> {
     await request<void>(`/pipelines/${id}`, {
         method: "PUT",
@@ -158,6 +122,39 @@ export async function deletePipeline(id: string): Promise<void> {
     await request<void>(`/pipelines/${id}`, { method: "DELETE" });
 }
 
-export async function duplicatePipeline(id: string): Promise<void> {
-    await request<void>(`/pipelines/${id}/duplicate`, { method: "POST" });
+// ── Processor definitions (GET /processors) ──────────────────────────────────
+// NOTE: This endpoint is not yet implemented in the backend.
+// The hook useProcessors falls back to hardcoded definitions when this returns 404.
+
+export async function getProcessors(): Promise<ProcessorDefinition[]> {
+    const payload = await request<ProcessorDefinition[]>("/processors");
+    return Array.isArray(payload) ? payload : [];
+}
+
+// ── Global Mapping (GET /mappings, POST /mappings) ────────────────────────────
+
+export async function getGlobalMapping(): Promise<MappingField[]> {
+    const payload = await request<MappingField[]>("/mappings");
+    return Array.isArray(payload) ? payload : [];
+}
+
+/**
+ * Replaces the entire global mapping.
+ * Backend endpoint: POST /mappings  body: { Mapping: MappingField[] }
+ */
+export async function setGlobalMapping(fields: MappingField[]): Promise<void> {
+    await request<void>("/mappings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ Mapping: fields }),
+    });
+}
+
+// ── Mapping types (GET /mapping-types) ───────────────────────────────────────
+// NOTE: This endpoint is not yet implemented in the backend.
+// The hook useMappingTypes falls back to hardcoded types when this returns 404.
+
+export async function getMappingTypes(): Promise<MappingType[]> {
+    const payload = await request<MappingType[]>("/mapping-types");
+    return Array.isArray(payload) ? payload : [];
 }

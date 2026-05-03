@@ -56,7 +56,7 @@ export type LogFiltersState = {
     page: number;
     pageSize: number;
     totalLogs: number;
-    setSource: (id: number | null) => void;
+    setSource: (id: string | null) => void;
     setTimeWindow: (v: string) => void;
     setFilterText: (v: string) => void;
     toggleColumn: (col: string) => void;
@@ -72,7 +72,7 @@ export type LogFiltersState = {
     refetchLogs: () => void;
 };
 
-export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
+export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
     const [searchParams, setSearchParams] = useSearchParams();
 
     const parseSourceId = (): string | null => {
@@ -207,7 +207,7 @@ export function useLogFilters(availableSourceIds: number[]): LogFiltersState {
         return filteredLogs.slice(start, start + pageSize);
     }, [filteredLogs, page, pageSize, totalPages]);
 
-    const setSource = useCallback((id: number | null) => {
+    const setSource = useCallback((id: string | null) => {
         updateParams({ source: id !== null ? String(id) : null, page: "1" });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
