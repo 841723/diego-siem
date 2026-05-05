@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 )
+type LogData = map[string]interface{}
 
 type Log struct {
 	ID        ID        `json:"id"`
@@ -11,8 +12,6 @@ type Log struct {
 	SourceID  ID        `json:"sourceid"`
 	Data      LogData   `json:"data"`
 }
-
-type LogData = map[string]interface{}
 
 type SourceConfig struct {
 	ID         ID     `json:"id"`
