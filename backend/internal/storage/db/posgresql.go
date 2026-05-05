@@ -2,20 +2,24 @@ package db
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"backend/internal/model"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type PostgreSQLDB struct {
 	// Add fields for PostgreSQL connection, e.g., connection pool
-	conn *pgx.Conn // Placeholder for actual connection type
+	pool *pgxpool.Pool
 }
 
 func NewPostgreSQLDB() *PostgreSQLDB {
 	// Initialize and return a new PostgreSQLDB instance
 	db := &PostgreSQLDB{}
+
 	if err := db.connect(); err != nil {
 		panic("Error connecting to PostgreSQL: " + err.Error())
 	}
@@ -24,12 +28,14 @@ func NewPostgreSQLDB() *PostgreSQLDB {
 
 func (db *PostgreSQLDB) connect() error {
 	// Implement connection logic to PostgreSQL
-	conn, err := pgx.Connect(context.Background(),
-		"postgres://siem:siem@postgres:5432/siem")
+	// postgres://postgres://siem:siem@postgres:5432/siem?pool_max_conns=10
+	config, _ := pgxpool.ParseConfig("user=siem password=siem host=postgres port=5432 dbname=siem pool_max_conns=10")
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		return err
 	}
-	db.conn = conn
+	db.pool = pool
 
 	err = db.Ping()
 	if err != nil {
@@ -40,14 +46,20 @@ func (db *PostgreSQLDB) connect() error {
 
 func (db *PostgreSQLDB) Ping() error {
 	// Implement ping logic to check PostgreSQL connection
-	err := db.conn.Ping(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := db.pool.Ping(ctx)
 	return err
 }
 
 func (db *PostgreSQLDB) GetVersion() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	// Implement logic to get PostgreSQL version
 	var version string
-	err := db.conn.QueryRow(context.Background(), "SELECT version()").Scan(&version)
+	err := db.pool.QueryRow(ctx, "SELECT version()").Scan(&version)
 	if err != nil {
 		return "", err
 	}
@@ -56,8 +68,10 @@ func (db *PostgreSQLDB) GetVersion() (string, error) {
 
 // Implement other methods for interacting with PostgreSQL as needed
 func (db *PostgreSQLDB) GetSourcesFromDB() ([]model.SourceConfig, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	// Implement logic to retrieve sources from PostgreSQL
-	rows, err := db.conn.Query(context.Background(), `
+	rows, err := db.pool.Query(ctx, `
 		SELECT id, port, protocol, parser, name, pipelineid
 		FROM sourceconfig
 	`)
@@ -93,19 +107,86 @@ func (db *PostgreSQLDB) GetSourcesFromDB() ([]model.SourceConfig, error) {
 	return sources, nil
 }
 
-func (db *PostgreSQLDB) AddSourceToDB(source model.SourceConfig) (int, error) {
-	// Implement logic to add a source to PostgreSQL
-	var id int
-	err := db.conn.QueryRow(context.Background(),
-		"INSERT INTO SourceConfig (protocol, port, parser, name, pipelineid) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-		source.Protocol, source.Port, source.Parser, source.Name, source.PipelineID).Scan(&id)
+func (db *PostgreSQLDB) GetSourceByIDFromDB(id model.ID) (*model.SourceConfig, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var s model.SourceConfig
+
+	err := db.pool.QueryRow(ctx, `
+		SELECT id, port, protocol, parser, name, pipelineid
+		FROM sourceconfig
+		WHERE id = $1
+	`, id).Scan(
+		&s.ID,
+		&s.Port,
+		&s.Protocol,
+		&s.Parser,
+		&s.Name,
+		&s.PipelineID,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
-		return -1, err
+		return nil, err
+	}
+
+	return &s, nil
+}
+
+func (db *PostgreSQLDB) GetSourceByPortAndProtocolFromDB(port int, protocol string) (*model.SourceConfig, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var s model.SourceConfig
+
+	err := db.pool.QueryRow(ctx, `
+		SELECT id, port, protocol, parser, name, pipelineid
+		FROM sourceconfig
+		WHERE port = $1 AND protocol = $2
+	`, port, protocol).Scan(
+		&s.ID,
+		&s.Port,
+		&s.Protocol,
+		&s.Parser,
+		&s.Name,
+		&s.PipelineID,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &s, nil
+}
+
+func (db *PostgreSQLDB) AddSourceToDB(source model.SourceConfig) (model.ID, error) {
+	//
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var id model.ID
+	err := db.pool.QueryRow(ctx,
+		"INSERT INTO SourceConfig (ID, protocol, port, parser, name, pipelineid) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+		source.ID, source.Protocol, source.Port, source.Parser, source.Name, source.PipelineID).Scan(&id)
+	if err != nil {
+		return model.GenerateErrorUUID(), err
 	}
 	return id, nil
 }
 
-func (db *PostgreSQLDB) DeleteSourceFromDB(sourceID int) error {
+func (db *PostgreSQLDB) UpdateSourceInDB(source model.SourceConfig) error {
+	// Implement logic to update a source in PostgreSQL
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"UPDATE SourceConfig SET protocol = $1, port = $2, parser = $3, name = $4, pipelineid = $5 WHERE id = $6",
+		source.Protocol, source.Port, source.Parser, source.Name, source.PipelineID, source.ID)
+	return err
+}
+
+func (db *PostgreSQLDB) DeleteSourceFromDB(sourceID model.ID) error {
 	// Implement logic to delete a source from PostgreSQL
 	return nil
 }
@@ -113,4 +194,322 @@ func (db *PostgreSQLDB) DeleteSourceFromDB(sourceID int) error {
 func (db *PostgreSQLDB) ClearSourcesFromDB() error {
 	// Implement logic to clear all sources from PostgreSQL
 	return nil
+}
+
+func (db *PostgreSQLDB) DeleteSourceByIDFromDB(sourceID model.ID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM SourceConfig WHERE id = $1",
+		sourceID)
+	return err
+}
+
+/*
+*******************************************************
+
+	Pipelines
+
+*******************************************************
+*/
+func (db *PostgreSQLDB) AddPipelineToDB(pipeline model.Pipeline) (model.ID, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var id model.ID
+	err := db.pool.QueryRow(ctx,
+		"INSERT INTO Pipeline (ID, name, description) VALUES ($1, $2, $3) RETURNING id",
+		pipeline.ID, pipeline.Name, pipeline.Description).Scan(&id)
+	if err != nil {
+		return model.GenerateErrorUUID(), err
+	}
+	return id, nil
+}
+
+func (db *PostgreSQLDB) GetPipelinesFromDB() ([]model.Pipeline, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// Implement logic to retrieve pipelines from PostgreSQL
+	rows, err := db.pool.Query(ctx, `
+		SELECT id, name, description
+		FROM pipeline
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var pipelines []model.Pipeline
+
+	for rows.Next() {
+		var p model.Pipeline
+
+		err := rows.Scan(
+			&p.ID,
+			&p.Name,
+			&p.Description,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		pipelines = append(pipelines, p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return pipelines, nil
+}
+
+func (db *PostgreSQLDB) GetPipelineByIDFromDB(id model.ID) (*model.Pipeline, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var p model.Pipeline
+
+	err := db.pool.QueryRow(ctx, `
+		SELECT id, name, description
+		FROM pipeline
+		WHERE id = $1
+	`, id).Scan(
+		&p.ID,
+		&p.Name,
+		&p.Description,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &p, nil
+}
+
+func (db *PostgreSQLDB) UpdatePipelineInDB(pipeline model.Pipeline) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"UPDATE Pipeline SET name = $1, description = $2 WHERE id = $3",
+		pipeline.Name, pipeline.Description, pipeline.ID)
+	return err
+}
+
+func (db *PostgreSQLDB) DeletePipelineFromDB(pipelineID model.ID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM Pipeline WHERE id = $1",
+		pipelineID)
+	return err
+}
+
+func (db *PostgreSQLDB) ClearPipelinesFromDB() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM Pipeline")
+	return err
+}
+
+func (db *PostgreSQLDB) DeletePipelineByIDFromDB(pipelineID model.ID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM Pipeline WHERE id = $1",
+		pipelineID)
+	return err
+}
+
+/*
+******************************************************
+
+	Processors
+
+*******************************************************
+*/
+
+func (db *PostgreSQLDB) AddProcessorToPipelineInDB(processor model.PipelineProcessor) (model.ID, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var id model.ID
+	err := db.pool.QueryRow(ctx,
+		"INSERT INTO PipelineProcessor (ID, pipelineid, type, config) VALUES ($1, $2, $3, $4) RETURNING id",
+		processor.ID, processor.PipelineID, processor.Type, processor.Config).Scan(&id)
+	if err != nil {
+		return model.GenerateErrorUUID(), err
+	}
+	return id, nil
+}
+
+func (db *PostgreSQLDB) GetProcessorsFromPipelineInDB(pipelineID model.ID) ([]model.PipelineProcessor, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := db.pool.Query(ctx, `
+		SELECT id, pipelineid, name, config
+		FROM pipelineprocessor
+		WHERE pipelineid = $1
+	`, pipelineID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var processors []model.PipelineProcessor
+
+	for rows.Next() {
+		var p model.PipelineProcessor
+
+		err := rows.Scan(
+			&p.ID,
+			&p.PipelineID,
+			&p.Type,
+			&p.Config,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		processors = append(processors, p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return processors, nil
+}
+
+func (db *PostgreSQLDB) UpdateProcessorInPipelineInDB(processor model.PipelineProcessor) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"UPDATE PipelineProcessor SET type = $1, config = $2 WHERE id = $3 AND pipelineid = $4",
+		processor.Type, processor.Config, processor.ID, processor.PipelineID)
+	return err
+}
+
+func (db *PostgreSQLDB) DeleteProcessorFromPipelineInDB(processorID model.ID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM PipelineProcessor WHERE id = $1",
+		processorID)
+	return err
+}
+
+/*
+******************************************************
+
+	Mappings
+
+*******************************************************
+*/
+func (db *PostgreSQLDB) AddMappingToDB(mapping model.Mapping) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := db.pool.Exec(ctx,
+		"INSERT INTO Mapping (FieldName, FieldTypeID, DefaultValue) VALUES ($1, $2, $3)",
+		mapping.FieldName, mapping.FieldTypeID, mapping.DefaultValue)
+	return err
+}
+
+func (db *PostgreSQLDB) GetMappingsFromDB() ([]model.Mapping, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := db.pool.Query(ctx, `
+		SELECT fieldname, fieldtypeid, defaultvalue
+		FROM mapping
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var mappings []model.Mapping
+
+	for rows.Next() {
+		var m model.Mapping
+
+		err := rows.Scan(
+			&m.FieldName,
+			&m.FieldTypeID,
+			&m.DefaultValue,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		mappings = append(mappings, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return mappings, nil
+}
+
+func (db *PostgreSQLDB) DeleteMappingsFromDB() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM Mapping WHERE true")
+	return err
+}
+
+/*
+******************************************************
+
+	Mapping Types
+
+******************************************************
+*/
+
+func (db *PostgreSQLDB) GetMappingTypesFromDB() ([]model.MappingType, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := db.pool.Query(ctx, `
+		SELECT id, typename, displayname
+		FROM mappingtype
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var types []model.MappingType
+
+	for rows.Next() {
+		var t model.MappingType
+
+		err := rows.Scan(&t.ID, &t.TypeName, &t.DisplayName)
+		if err != nil {
+			return nil, err
+		}
+
+		types = append(types, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return types, nil
+}
+
+func (db *PostgreSQLDB) IsValidMappingType(dataType string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var id model.ID
+	err := db.pool.QueryRow(ctx,
+		"SELECT id FROM MappingType WHERE typename = $1",
+		dataType).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

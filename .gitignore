@@ -3,3 +3,4 @@ frontend/dist/
 bak.frontend/
 
 backend/tmp/main
+/backend/tmp

@@ -1,1 +1,45 @@
 @import "tailwindcss";
+
+:root {
+  /* Brand */
+  --primary-raw: #d3d6d8;
+  --secondary-raw: #24313d;
+
+  /* Layout */
+  --background-raw: #38414b;
+  --surface-raw: #a7adb1;
+
+  /* Text */
+  --muted-raw: #d3d6d8;
+  --text-raw: #404136;
+  --text-logo-raw: #F2F2F2;
+
+  /* Accent */
+  --accent-raw: #5e85be;
+
+  /* States */
+  --success-raw: #4ADE80;
+  --error-raw: #cf2a2a;
+  --warning-raw: #FBBF24;
+  --info-raw: #60A5FA;
+}
+
+
+@theme inline {
+    --color-primary: var(--primary-raw);
+    --color-secondary: var(--secondary-raw);
+
+    --color-background: var(--background-raw);
+    --color-surface: var(--surface-raw);
+
+    --color-muted: var(--muted-raw);
+    --color-text: var(--text-raw);
+    --color-text-logo: var(--text-logo-raw);
+
+    --color-accent: var(--accent-raw);
+
+    --color-success: var(--success-raw);
+    --color-error: var(--error-raw);
+    --color-warning: var(--warning-raw);
+    --color-info: var(--info-raw);
+}

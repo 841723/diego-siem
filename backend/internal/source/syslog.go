@@ -63,7 +63,7 @@ func StartSyslogServer(cfg model.SourceConfig, outChannel chan<- model.Log) {
 	go syslogServer.Start()
 }
 
-func parseSyslog(raw string, source int) (*model.Log, error) {
+func parseSyslog(raw string, source model.ID) (*model.Log, error) {
 	p := rfc5424.NewParser(rfc5424.WithBestEffort())
 
 	m, err := p.Parse([]byte(raw))
@@ -73,28 +73,29 @@ func parseSyslog(raw string, source int) (*model.Log, error) {
 
 	sm := m.(*rfc5424.SyslogMessage)
 
-	ts := time.Now().Unix()
+	ts := time.Now()
 	if sm.Timestamp != nil {
-		ts = sm.Timestamp.Unix()
+		ts = *sm.Timestamp
 	}
 
-	var payload map[string]interface{}
+	payload := make(map[string]interface{})
 
 	if sm.Message != nil {
 		msg := *sm.Message
 
 		if json.Valid([]byte(msg)) {
-			json.Unmarshal([]byte(msg), &payload)
-		} else {
-			payload = map[string]interface{}{
-				"message": msg,
+			if err := json.Unmarshal([]byte(msg), &payload); err != nil {
+				payload["message"] = msg
 			}
+		} else {
+			payload["message"] = msg
 		}
 	} else {
 		payload = map[string]interface{}{}
 	}
 
 	return &model.Log{
+		ID:        model.GenerateUUID(),
 		Timestamp: ts,
 		SourceID:  source,
 		Data:      payload,

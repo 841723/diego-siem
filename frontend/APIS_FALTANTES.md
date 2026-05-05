@@ -1,183 +1,138 @@
-# APIs faltantes para frontend SIEM
+# APIs faltantes / pendientes — frontend SIEM
 
-Este frontend ya consume:
+Este documento refleja el estado actual de la integración frontend↔backend.
+Todos los IDs son UUIDs (string), no enteros.
 
-- `GET /logs`
-- `GET /sources/`
-- `POST /sources/`
+---
 
-Para soportar completamente la UI se necesitan estos endpoints adicionales:
+## ✅ Endpoints ya disponibles y consumidos
 
-## Logs (consulta avanzada)
+| Método   | Ruta              | Descripción                                  |
+| -------- | ----------------- | -------------------------------------------- |
+| `GET`    | `/sources`        | Lista fuentes                                |
+| `POST`   | `/sources`        | Crea una fuente                              |
+| `GET`    | `/sources/:id`    | Detalle de una fuente                        |
+| `PUT`    | `/sources/:id`    | Actualiza una fuente                         |
+| `DELETE` | `/sources/:id`    | Elimina una fuente                           |
+| `POST`   | `/logs/:sourceId` | Consulta logs de una fuente (con paginación) |
+| `GET`    | `/pipelines`      | Lista pipelines                              |
+| `POST`   | `/pipelines`      | Crea un pipeline                             |
+| `GET`    | `/pipelines/:id`  | Detalle de un pipeline                       |
+| `PUT`    | `/pipelines/:id`  | Actualiza un pipeline                        |
+| `DELETE` | `/pipelines/:id`  | Elimina un pipeline                          |
+| `GET`    | `/mappings`       | Lee el mapping global (lista de campos)      |
+| `POST`   | `/mappings`       | Reemplaza el mapping global completo         |
 
-### `POST /logs/search`
+---
 
-Permite resolver filtrado, columnas, ventana temporal y paginación del lado servidor.
+## ❌ Endpoints pendientes de implementar en el backend
 
-Request:
+### Procesadores de pipeline
+
+#### `GET /processors`
+
+Devuelve los tipos de procesador disponibles con su esquema de configuración.
+El frontend usa una lista hardcodeada como fallback mientras este endpoint no exista.
+
+Response esperado:
 
 ```json
-{
-  "source_ids": ["web-syslog-1", "fw-udp-2"],
-  "time_range": {
-    "from": "2026-04-22T20:00:00Z",
-    "to": "2026-04-22T23:00:00Z"
-  },
-  "filters": [
-    { "field": "severity", "operator": "eq", "value": "error" },
-    { "field": "host", "operator": "contains", "value": "db01" }
-  ],
-  "query": "authentication failed",
-  "columns": ["timestamp", "source_id", "host", "severity", "message"],
-  "pagination": { "page": 1, "page_size": 25 },
-  "sort": [{ "field": "timestamp", "direction": "desc" }]
-}
-```
-
-Response:
-
-```json
-{
-  "items": [
+[
     {
-      "timestamp": 1713816000,
-      "source_id": "web-syslog-1",
-      "data": {
-        "host": "web01",
-        "severity": "error",
-        "message": "authentication failed"
-      }
+        "id": "set",
+        "name": "set",
+        "description": "Establece un valor en un campo",
+        "config": {
+            "field": "string",
+            "value": "string"
+        }
+    },
+    {
+        "id": "drop",
+        "name": "drop",
+        "description": "Descarta el evento",
+        "config": {}
+    },
+    {
+        "id": "copy",
+        "name": "copy",
+        "description": "Copia un campo a otro",
+        "config": {
+            "source_field": "string",
+            "destination_field": "string"
+        }
     }
-  ],
-  "pagination": {
-    "page": 1,
-    "page_size": 25,
-    "total_items": 312,
-    "total_pages": 13
-  }
-}
+]
 ```
 
-## Mappings
+#### `GET /pipelines/:id/processors`
 
-### `POST /mappings`
+Devuelve los procesadores configurados para un pipeline concreto.
+Necesario para mostrarlos en la vista de detalle del pipeline.
+
+Response esperado:
+
+```json
+[
+    {
+        "id": "uuid",
+        "pipelineid": "uuid",
+        "type": "set",
+        "config": "{\"field\":\"host\",\"value\":\"unknown\"}"
+    }
+]
+```
+
+#### `POST /pipelines/:id/processors`
+
+Reemplaza la lista de procesadores de un pipeline.
+Necesario para persistir los procesadores desde el formulario de edición.
 
 Request:
 
 ```json
-{
-  "id": "syslog-default",
-  "fields": ["timestamp", "host", "program", "severity", "message"]
-}
-```
-
-Response: `201 Created`
-
-```json
-{ "id": "syslog-default" }
-```
-
-### `GET /mappings`
-
-Response:
-
-```json
 [
-  {
-    "id": "syslog-default",
-    "fields": ["timestamp", "host", "program", "severity", "message"]
-  }
+    { "type": "set", "config": "{\"field\":\"host\",\"value\":\"unknown\"}" },
+    { "type": "lowercase", "config": "{\"field\":\"severity\"}" }
 ]
 ```
 
-## Pipelines
+---
 
-### `POST /pipelines`
+### Tipos de campo del mapping
 
-Request:
+#### `GET /mappings/types`
 
-```json
-{
-  "id": "syslog-normalize",
-  "processors": ["parse_syslog", "normalize_severity", "extract_ip"]
-}
-```
+Devuelve los tipos de campo disponibles para el mapping global.
+El frontend usa tipos hardcodeados como fallback mientras este endpoint no exista.
 
-Response: `201 Created`
-
-```json
-{ "id": "syslog-normalize" }
-```
-
-### `GET /pipelines`
-
-Response:
+Response esperado:
 
 ```json
 [
-  {
-    "id": "syslog-normalize",
-    "processors": ["parse_syslog", "normalize_severity", "extract_ip"]
-  }
+    { "id": "uuid-1", "type_name": "string" },
+    { "id": "uuid-2", "type_name": "integer" },
+    { "id": "uuid-3", "type_name": "decimal" },
+    { "id": "uuid-4", "type_name": "boolean" },
+    { "id": "uuid-5", "type_name": "date" },
+    { "id": "uuid-6", "type_name": "ip" },
+    { "id": "uuid-7", "type_name": "timestamp" }
 ]
 ```
 
-## Reglas
+---
 
-### `POST /rules`
+### Alertas / Reglas (futuro)
 
-Request:
+#### `GET /rules`, `POST /rules`, `PATCH /rules/:id`
 
-```json
-{
-  "id": "auth-fail-burst",
-  "query": "severity:error AND message:\"authentication failed\"",
-  "interval_seconds": 60,
-  "action": "webhook:https://alerts.example.com/siem"
-}
-```
+Para un módulo de alertas automáticas basadas en consultas sobre los logs.
+No hay página en el frontend todavía.
 
-Response: `201 Created`
+---
 
-```json
-{ "id": "auth-fail-burst" }
-```
+## Notas
 
-### `GET /rules`
-
-Response:
-
-```json
-[
-  {
-    "id": "auth-fail-burst",
-    "query": "severity:error AND message:\"authentication failed\"",
-    "interval_seconds": 60,
-    "action": "webhook:https://alerts.example.com/siem",
-    "enabled": true,
-    "last_run_at": "2026-04-22T22:59:10Z",
-    "last_match_count": 3
-  }
-]
-```
-
-### `PATCH /rules/{id}`
-
-Se usa para habilitar/deshabilitar o modificar una regla.
-
-Request ejemplo:
-
-```json
-{
-  "enabled": false
-}
-```
-
-Response:
-
-```json
-{
-  "id": "auth-fail-burst",
-  "enabled": false
-}
-```
+- El campo `config` de `PipelineProcessor` es un JSON string serializado, no un objeto JSON.
+- El endpoint `POST /mappings` acepta `{ Mapping: [...] }` (objeto con clave `Mapping`) y reemplaza
+  **toda** la colección de campos del mapping global en una sola operación.
