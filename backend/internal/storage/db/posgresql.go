@@ -186,11 +186,6 @@ func (db *PostgreSQLDB) UpdateSourceInDB(source model.SourceConfig) error {
 	return err
 }
 
-func (db *PostgreSQLDB) DeleteSourceFromDB(sourceID model.ID) error {
-	// Implement logic to delete a source from PostgreSQL
-	return nil
-}
-
 func (db *PostgreSQLDB) ClearSourcesFromDB() error {
 	// Implement logic to clear all sources from PostgreSQL
 	return nil

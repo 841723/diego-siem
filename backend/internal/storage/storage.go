@@ -68,10 +68,6 @@ func (s *Storage) UpdateSource(source model.SourceConfig) error {
 	return s.postgres.UpdateSourceInDB(source)
 }
 
-func (s *Storage) DeleteSource(sourceID model.ID) error {
-	return s.postgres.DeleteSourceFromDB(sourceID)
-}
-
 func (s *Storage) ClearSources() error {
 	return s.postgres.ClearSourcesFromDB()
 }
