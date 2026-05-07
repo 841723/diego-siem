@@ -68,7 +68,9 @@ export const RULE_CONFIG_SCHEMA: RuleConfigSchema = {
     ],
 };
 
-export function defaultConfigForRuleType(type: RuleType): Record<string, unknown> {
+export function getDefaultConfigForRuleType(
+    type: RuleType,
+): Record<string, unknown> {
     return RULE_CONFIG_SCHEMA[type].reduce<Record<string, unknown>>((acc, field) => {
         if (field.type === "number") {
             acc[field.key] = 0;

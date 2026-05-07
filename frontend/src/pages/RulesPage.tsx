@@ -36,7 +36,6 @@ export default function RulesPage() {
         try {
             await createRule({
                 ...rule,
-                id: crypto.randomUUID(),
                 name: `${rule.name} (copia)`,
             });
             refetch();

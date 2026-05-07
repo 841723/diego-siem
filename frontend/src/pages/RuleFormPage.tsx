@@ -5,7 +5,7 @@ import RuleConfigFields from "../components/RuleConfigFields";
 import { createRule, getRule, updateRule } from "../services/api";
 import type { Rule, RuleSeverity, RuleType } from "../types";
 import {
-    defaultConfigForRuleType,
+    getDefaultConfigForRuleType,
     RULE_SEVERITIES,
     RULE_TYPES,
 } from "../types/rules";
@@ -24,7 +24,7 @@ export default function RuleFormPage() {
     const [enabled, setEnabled] = useState(true);
     const [severity, setSeverity] = useState<RuleSeverity>(DEFAULT_SEVERITY);
     const [config, setConfig] = useState<Record<string, unknown>>(
-        defaultConfigForRuleType(DEFAULT_TYPE),
+        getDefaultConfigForRuleType(DEFAULT_TYPE),
     );
 
     const [loadingItem, setLoadingItem] = useState(isEdit);
@@ -45,7 +45,7 @@ export default function RuleFormPage() {
                 setType(rule.type);
                 setEnabled(rule.enabled);
                 setSeverity(rule.severity);
-                setConfig(rule.config ?? defaultConfigForRuleType(rule.type));
+                setConfig(rule.config ?? getDefaultConfigForRuleType(rule.type));
             })
             .catch((err: Error) => {
                 if (!cancelled) {
@@ -63,7 +63,7 @@ export default function RuleFormPage() {
 
     function handleTypeChange(nextType: RuleType) {
         setType(nextType);
-        setConfig(defaultConfigForRuleType(nextType));
+        setConfig(getDefaultConfigForRuleType(nextType));
     }
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -85,7 +85,7 @@ export default function RuleFormPage() {
             if (isEdit && id) {
                 await updateRule(id, payload);
             } else {
-                await createRule({ id: crypto.randomUUID(), ...payload });
+                await createRule(payload);
             }
             navigate("/rules");
         } catch (err) {

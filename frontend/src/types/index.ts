@@ -51,6 +51,7 @@ export type ProcessorDefinition = {
 
 /** Client-side draft of a single processor inside a pipeline form */
 export type PipelineProcessorDraft = {
+    clientId: string;
     processorId: string;
     config: Record<string, unknown>;
 };

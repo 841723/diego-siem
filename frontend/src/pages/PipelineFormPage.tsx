@@ -8,6 +8,7 @@ import {
     getPipelineProcessors,
     updatePipeline,
     deletePipelineProcessor,
+    updatePipelineProcessor,
 } from "../services/api";
 import type { Pipeline, PipelineProcessorDraft, ProcessorDefinition } from "../types";
 import LoadingState from "../components/LoadingState";
@@ -251,6 +252,7 @@ export default function PipelineFormPage() {
     const defaultDraft = useMemo<PipelineProcessorDraft | null>(() => {
         if (processorDefs.length === 0) return null;
         return {
+            clientId: crypto.randomUUID(),
             processorId: processorDefs[0].id,
             config: emptyConfigFor(processorDefs[0]),
         };
@@ -267,7 +269,8 @@ export default function PipelineFormPage() {
                 setName(full.pipeline.name);
                 setDescription(full.pipeline.description ?? "");
                 setDrafts(
-                    full.processors.map((item) => ({
+                    full.processors.map((item, index) => ({
+                        clientId: item.id || `existing-${index}`,
                         processorId: item.processorid,
                         config: item.config,
                     })),
@@ -295,7 +298,8 @@ export default function PipelineFormPage() {
             .then((full) => {
                 if (cancelled) return;
                 setDrafts(
-                    full.processors.map((item) => ({
+                    full.processors.map((item, index) => ({
+                        clientId: item.id || `copied-${index}`,
                         processorId: item.processorid,
                         config: item.config,
                     })),
@@ -324,7 +328,11 @@ export default function PipelineFormPage() {
         if (!defaultDraft) return;
         setDrafts((prev) => [
             ...prev,
-            { ...defaultDraft, config: { ...defaultDraft.config } },
+            {
+                ...defaultDraft,
+                clientId: crypto.randomUUID(),
+                config: { ...defaultDraft.config },
+            },
         ]);
     }
 
@@ -361,15 +369,28 @@ export default function PipelineFormPage() {
 
     async function syncPipelineProcessors(pipelineId: string) {
         const existing = await getPipelineProcessors(pipelineId);
-        await Promise.all(
-            existing.map((item) => deletePipelineProcessor(pipelineId, item.id)),
-        );
-        for (const draft of drafts) {
+        const sharedCount = Math.min(existing.length, drafts.length);
+
+        for (let index = 0; index < sharedCount; index += 1) {
+            const target = existing[index];
+            const draft = drafts[index];
+            await updatePipelineProcessor(pipelineId, target.id, {
+                processorid: draft.processorId,
+                config: draft.config,
+            });
+        }
+
+        for (let index = sharedCount; index < drafts.length; index += 1) {
+            const draft = drafts[index];
             await createPipelineProcessor(pipelineId, {
                 id: crypto.randomUUID(),
                 processorid: draft.processorId,
                 config: draft.config,
             });
+        }
+
+        for (let index = sharedCount; index < existing.length; index += 1) {
+            await deletePipelineProcessor(pipelineId, existing[index].id);
         }
     }
 
@@ -475,7 +496,7 @@ export default function PipelineFormPage() {
                             ) : (
                                 <div className="space-y-2">
                                     {drafts.map((draft, index) => (
-                                        <div key={`${draft.processorId}-${index}`}>
+                                        <div key={draft.clientId}>
                                             <ProcessorRow
                                                 index={index}
                                                 draft={draft}
