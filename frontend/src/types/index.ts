@@ -46,13 +46,28 @@ export type ProcessorDefinition = {
     id: string;
     name: string;
     description: string;
-    config: Record<string, string>;
+    schema: Record<string, unknown>;
 };
 
 /** Client-side draft of a single processor inside a pipeline form */
 export type PipelineProcessorDraft = {
-    type: string;
+    clientId: string;
+    processorId: string;
     config: Record<string, unknown>;
+};
+
+export type PipelineProcessor = {
+    id: string;
+    pipelineid: string;
+    processorid: string;
+    config: Record<string, unknown>;
+    processor?: ProcessorDefinition;
+    pipeline?: Pipeline;
+};
+
+export type FullPipeline = {
+    pipeline: Pipeline;
+    processors: PipelineProcessor[];
 };
 
 // ── Mapping (global) ─────────────────────────────────────────────────────────
@@ -72,4 +87,39 @@ export type MappingType = {
     id: string;
     typename: string;
     displayname: string;
+};
+
+// ── Rules & alerts ─────────────────────────────────────────────────────────────
+
+export type RuleType =
+    | "threshold"
+    | "match"
+    | "correlation"
+    | "aggregation"
+    | "temporal";
+
+export type RuleSeverity = "low" | "medium" | "high" | "critical";
+
+export type Rule = {
+    id: string;
+    name: string;
+    description: string;
+    type: RuleType;
+    enabled: boolean;
+    severity: RuleSeverity;
+    config: Record<string, unknown>;
+    last_execution_at?: string | null;
+    created_at?: string;
+    updated_at?: string;
+};
+
+export type RuleAlert = {
+    id: string;
+    rule_id: string;
+    rule_name: string;
+    timestamp: string;
+    severity: RuleSeverity;
+    message: string;
+    status: "open" | "acknowledged" | "resolved";
+    details?: Record<string, unknown>;
 };

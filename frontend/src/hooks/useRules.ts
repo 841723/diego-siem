@@ -1,33 +1,35 @@
 import { useEffect, useState } from "react";
-import type { ProcessorDefinition } from "../types";
-import { getProcessors } from "../services/api";
+import { getRules } from "../services/api";
+import type { Rule } from "../types";
 
-export type ProcessorsState = {
-    processors: ProcessorDefinition[];
+export type RulesState = {
+    rules: Rule[];
     loading: boolean;
     error: string;
+    refetch: () => void;
 };
 
-export function useProcessors(): ProcessorsState {
-    const [processors, setProcessors] = useState<ProcessorDefinition[]>([]);
+export function useRules(): RulesState {
+    const [rules, setRules] = useState<Rule[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [tick, setTick] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
         setError("");
 
-        getProcessors()
+        getRules()
             .then((data) => {
                 if (!cancelled) {
-                    setProcessors(data);
+                    setRules(data);
                 }
             })
             .catch((err: Error) => {
                 if (!cancelled) {
-                    setProcessors([]);
-                    setError(err.message || "Error cargando procesadores");
+                    setRules([]);
+                    setError(err.message || "Error cargando reglas");
                 }
             })
             .finally(() => {
@@ -37,7 +39,12 @@ export function useProcessors(): ProcessorsState {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [tick]);
 
-    return { processors, loading, error };
+    return {
+        rules,
+        loading,
+        error,
+        refetch: () => setTick((value) => value + 1),
+    };
 }

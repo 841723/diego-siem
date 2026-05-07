@@ -172,16 +172,18 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
 
     const filteredLogs = useMemo(() => {
         const now = Date.now();
-        const window =
-            TIME_WINDOWS.find((w) => w.value === timeWindow) ?? TIME_WINDOWS[2];
+        const selectedWindow =
+            TIME_WINDOWS.find((item) => item.value === timeWindow) ??
+            TIME_WINDOWS[2];
 
         return logs.filter((log) => {
             if (sourceId !== null && log.sourceid !== sourceId) return false;
-
-            // if (window.ms !== null) {
-            //     if (toTimestampMs(log.timestamp) < now - window.ms)
-            //         return false;
-            // }
+            if (selectedWindow.ms !== null) {
+                const timestamp = Date.parse(log.timestamp);
+                if (!Number.isNaN(timestamp) && timestamp < now - selectedWindow.ms) {
+                    return false;
+                }
+            }
 
             if (!filterText.trim()) return true;
             const needle = filterText.trim().toLowerCase();
