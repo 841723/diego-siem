@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePipelines } from "../hooks/usePipelines";
-import { deletePipeline } from "../services/api";
-import type { Pipeline } from "../types";
+import { deletePipeline, getPipelineProcessors } from "../services/api";
+import type { Pipeline, PipelineProcessorDraft } from "../types";
 import ConfirmModal from "../components/ConfirmModal";
 import DataTable from "../components/DataTable";
 import LoadingState from "../components/LoadingState";
@@ -25,9 +25,20 @@ export default function PipelinesPage() {
         }
     }
 
-    function handleDuplicate(pl: Pipeline) {
+    async function handleDuplicate(pl: Pipeline) {
+        let processors: PipelineProcessorDraft[] = [];
+        try {
+            const remote = await getPipelineProcessors(pl.id);
+            processors = remote.map((item) => ({ type: item.type, config: item.config }));
+        } catch {
+            processors = [];
+        }
         navigate("/pipelines/new", {
-            state: { name: `${pl.name} (copia)`, description: pl.description },
+            state: {
+                name: `${pl.name} (copia)`,
+                description: pl.description,
+                processors,
+            },
         });
     }
 

@@ -171,10 +171,6 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
     }, [logs]);
 
     const filteredLogs = useMemo(() => {
-        const now = Date.now();
-        const window =
-            TIME_WINDOWS.find((w) => w.value === timeWindow) ?? TIME_WINDOWS[2];
-
         return logs.filter((log) => {
             if (sourceId !== null && log.sourceid !== sourceId) return false;
 

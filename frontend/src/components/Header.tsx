@@ -5,6 +5,7 @@ const NAV_ITEMS = [
     { to: "/sources", label: "Fuentes" },
     { to: "/mapping", label: "Mapping" },
     { to: "/pipelines", label: "Pipelines" },
+    { to: "/rules", label: "Rules" },
 ];
 
 export default function Header() {

@@ -1,159 +1,107 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { createPipeline, getPipeline, updatePipeline } from "../services/api";
-import { useProcessors } from "../hooks/useProcessors";
-import type { Pipeline, PipelineProcessorDraft, ProcessorDefinition } from "../types";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import LoadingState from "../components/LoadingState";
+import PipelineProcessorRow from "../components/PipelineProcessorRow";
+import { usePipelineProcessors } from "../hooks/usePipelineProcessors";
+import { useProcessors } from "../hooks/useProcessors";
+import {
+    createPipeline,
+    createPipelineProcessor,
+    getPipeline,
+    updatePipeline,
+    updatePipelineProcessor,
+    deletePipelineProcessor,
+} from "../services/api";
+import type {
+    DynamicSchema,
+    Pipeline,
+    PipelineProcessorDraft,
+    ProcessorDefinition,
+} from "../types";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function emptyConfigFor(def: ProcessorDefinition): Record<string, unknown> {
-    const cfg: Record<string, unknown> = {};
-    for (const [key, type] of Object.entries(def.config)) {
-        cfg[key] = type === "number" ? 0 : type === "boolean" ? false : "";
-    }
-    return cfg;
-}
-
-// ── Processor row component ───────────────────────────────────────────────────
-
-type ProcessorRowProps = {
-    index: number;
-    draft: PipelineProcessorDraft;
-    definitions: ProcessorDefinition[];
-    canRemove: boolean;
-    onTypeChange: (type: string) => void;
-    onConfigChange: (config: Record<string, unknown>) => void;
-    onRemove: () => void;
+type PrefillState = Partial<Pick<Pipeline, "name" | "description">> & {
+    processors?: PipelineProcessorDraft[];
 };
 
-function ProcessorRow({
-    index,
-    draft,
-    definitions,
-    canRemove,
-    onTypeChange,
-    onConfigChange,
-    onRemove,
-}: ProcessorRowProps) {
-    const def = definitions.find((d) => d.id === draft.type) ?? definitions[0];
-    const configKeys = def ? Object.entries(def.config) : [];
-
-    function handleTypeChange(newType: string) {
-        const newDef = definitions.find((d) => d.id === newType);
-        onConfigChange(newDef ? emptyConfigFor(newDef) : {});
-        onTypeChange(newType);
+function defaultsFromSchema(schema: DynamicSchema): Record<string, unknown> {
+    const output: Record<string, unknown> = {};
+    for (const [key, descriptor] of Object.entries(schema)) {
+        if (typeof descriptor === "object") {
+            output[key] = defaultsFromSchema(descriptor);
+            continue;
+        }
+        output[key] =
+            descriptor === "number"
+                ? 0
+                : descriptor === "boolean"
+                  ? false
+                  : descriptor === "array"
+                    ? []
+                    : descriptor === "json"
+                      ? {}
+                      : "";
     }
-
-    function handleFieldChange(key: string, value: unknown) {
-        onConfigChange({ ...draft.config, [key]: value });
-    }
-
-    return (
-        <div className="rounded border border-border bg-surface p-3 space-y-3">
-            <div className="flex items-center gap-3">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-xs text-muted">
-                    {index + 1}
-                </span>
-
-                <div className="flex-1 space-y-1">
-                    <label className="block text-xs text-muted">Tipo de procesador</label>
-                    <select
-                        className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent"
-                        value={draft.type}
-                        onChange={(e) => handleTypeChange(e.target.value)}
-                    >
-                        {definitions.map((d) => (
-                            <option key={d.id} value={d.id}>
-                                {d.name}
-                                {d.description ? ` — ${d.description}` : ""}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                <button
-                    type="button"
-                    onClick={onRemove}
-                    disabled={!canRemove}
-                    className="mt-4 rounded px-2 py-0.5 text-xs text-error hover:bg-error/10 disabled:opacity-30"
-                    title="Eliminar procesador"
-                >
-                    ✕
-                </button>
-            </div>
-
-            {/* Dynamic config fields */}
-            {configKeys.length > 0 && (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 pl-8">
-                    {configKeys.map(([key, fieldType]) => (
-                        <div key={key} className="space-y-0.5">
-                            <label className="block text-xs text-muted">{key}</label>
-                            {fieldType === "boolean" ? (
-                                <input
-                                    type="checkbox"
-                                    className="h-4 w-4 accent-accent"
-                                    checked={Boolean(draft.config[key] ?? false)}
-                                    onChange={(e) => handleFieldChange(key, e.target.checked)}
-                                />
-                            ) : (
-                                <input
-                                    type={fieldType === "number" ? "number" : "text"}
-                                    className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent"
-                                    value={String(draft.config[key] ?? "")}
-                                    onChange={(e) =>
-                                        handleFieldChange(
-                                            key,
-                                            fieldType === "number"
-                                                ? Number(e.target.value)
-                                                : e.target.value,
-                                        )
-                                    }
-                                    placeholder={key}
-                                />
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
+    return output;
 }
 
-// ── Main form ─────────────────────────────────────────────────────────────────
+function normalizeDrafts(
+    definitions: ProcessorDefinition[],
+    drafts: PipelineProcessorDraft[],
+): PipelineProcessorDraft[] {
+    if (definitions.length === 0) return drafts;
+    const known = new Set(definitions.map((definition) => definition.id));
+    return drafts.map((draft) => {
+        if (known.has(draft.type)) return draft;
+        return { ...draft, type: definitions[0].id };
+    });
+}
 
 export default function PipelineFormPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const location = useLocation();
-
     const isEdit = Boolean(id);
-    const prefill = location.state as Partial<Pick<Pipeline, "name" | "description">> | null;
+    const prefill = (location.state as PrefillState | null) ?? null;
 
-    const { processors: processorDefs, loading: defsLoading, usingFallback } = useProcessors();
+    const {
+        processors: definitions,
+        loading: definitionsLoading,
+        error: definitionsError,
+    } = useProcessors();
+    const {
+        processors: remoteProcessors,
+        loading: processorsLoading,
+        error: processorsError,
+    } = usePipelineProcessors(id);
 
     const [name, setName] = useState(prefill?.name ?? "");
     const [description, setDescription] = useState(prefill?.description ?? "");
-    const [drafts, setDrafts] = useState<PipelineProcessorDraft[]>([]);
+    const [drafts, setDrafts] = useState<PipelineProcessorDraft[]>(
+        prefill?.processors ?? [],
+    );
+    const [originalDrafts, setOriginalDrafts] = useState<PipelineProcessorDraft[]>([]);
     const [loadingItem, setLoadingItem] = useState(isEdit);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
 
-    // Once processor definitions are loaded, initialise the drafts list
+    const canAddProcessor = !definitionsLoading && definitions.length > 0;
+
     const defaultDraft = useMemo<PipelineProcessorDraft | null>(() => {
-        if (processorDefs.length === 0) return null;
-        return { type: processorDefs[0].id, config: emptyConfigFor(processorDefs[0]) };
-    }, [processorDefs]);
+        const first = definitions[0];
+        if (!first) return null;
+        return { type: first.id, config: defaultsFromSchema(first.schema) };
+    }, [definitions]);
 
     useEffect(() => {
         if (!isEdit || !id) return;
         let cancelled = false;
         setLoadingItem(true);
         getPipeline(id)
-            .then((pl) => {
+            .then((pipeline) => {
                 if (!cancelled) {
-                    setName(pl.name);
-                    setDescription(pl.description ?? "");
+                    setName(pipeline.name);
+                    setDescription(pipeline.description ?? "");
                 }
             })
             .catch((err: Error) => {
@@ -162,62 +110,148 @@ export default function PipelineFormPage() {
             .finally(() => {
                 if (!cancelled) setLoadingItem(false);
             });
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [id, isEdit]);
 
-    // Seed one empty processor row once definitions are ready
     useEffect(() => {
-        if (!defsLoading && defaultDraft && drafts.length === 0) {
+        if (!isEdit) return;
+        const mapped = remoteProcessors.map((processor) => ({
+            id: processor.id,
+            type: processor.type,
+            config: processor.config,
+        }));
+        setOriginalDrafts(mapped);
+        setDrafts((current) => (current.length > 0 ? current : mapped));
+    }, [isEdit, remoteProcessors]);
+
+    useEffect(() => {
+        if (!definitionsLoading && defaultDraft && drafts.length === 0 && !isEdit) {
             setDrafts([defaultDraft]);
         }
-    }, [defsLoading, defaultDraft, drafts.length]);
+    }, [defaultDraft, definitionsLoading, drafts.length, isEdit]);
+
+    useEffect(() => {
+        if (definitions.length === 0 || drafts.length === 0) return;
+        setDrafts((current) => normalizeDrafts(definitions, current));
+    }, [definitions, drafts.length]);
 
     function addProcessor() {
         if (!defaultDraft) return;
-        setDrafts((prev) => [...prev, { ...defaultDraft, config: { ...defaultDraft.config } }]);
+        setDrafts((current) => [...current, { ...defaultDraft }]);
+        setSuccess("");
     }
 
     function removeProcessor(index: number) {
-        setDrafts((prev) => prev.filter((_, i) => i !== index));
+        setDrafts((current) => current.filter((_, currentIndex) => currentIndex !== index));
+        setSuccess("");
     }
 
-    function updateType(index: number, type: string) {
-        setDrafts((prev) =>
-            prev.map((d, i) => (i === index ? { ...d, type } : d)),
+    function moveProcessor(index: number, direction: -1 | 1) {
+        setDrafts((current) => {
+            const destination = index + direction;
+            if (destination < 0 || destination >= current.length) return current;
+            const next = [...current];
+            const [selected] = next.splice(index, 1);
+            next.splice(destination, 0, selected);
+            return next;
+        });
+        setSuccess("");
+    }
+
+    function handleTypeChange(index: number, type: string) {
+        const definition = definitions.find((item) => item.id === type);
+        const nextConfig = definition ? defaultsFromSchema(definition.schema) : {};
+        setDrafts((current) =>
+            current.map((item, currentIndex) =>
+                currentIndex === index ? { ...item, type, config: nextConfig } : item,
+            ),
         );
+        setSuccess("");
     }
 
-    function updateConfig(index: number, config: Record<string, unknown>) {
-        setDrafts((prev) =>
-            prev.map((d, i) => (i === index ? { ...d, config } : d)),
+    function handleConfigChange(index: number, config: Record<string, unknown>) {
+        setDrafts((current) =>
+            current.map((item, currentIndex) =>
+                currentIndex === index ? { ...item, config } : item,
+            ),
         );
+        setSuccess("");
     }
 
-    async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-        e.preventDefault();
+    async function persistProcessors(pipelineId: string) {
+        const originalById = new Map(
+            originalDrafts
+                .filter((item): item is PipelineProcessorDraft & { id: string } => Boolean(item.id))
+                .map((item) => [item.id, item]),
+        );
+        const currentIds = new Set(
+            drafts
+                .map((item) => item.id)
+                .filter((value): value is string => Boolean(value)),
+        );
+
+        await Promise.all(
+            [...originalById.keys()]
+                .filter((processorId) => !currentIds.has(processorId))
+                .map((processorId) => deletePipelineProcessor(pipelineId, processorId)),
+        );
+
+        for (const [index, draft] of drafts.entries()) {
+            const payload = {
+                type: draft.type,
+                processorid: draft.type,
+                config: draft.config,
+                position: index,
+            };
+            if (draft.id && originalById.has(draft.id)) {
+                await updatePipelineProcessor(pipelineId, draft.id, payload);
+                continue;
+            }
+            await createPipelineProcessor(pipelineId, payload);
+        }
+    }
+
+    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
         setError("");
+        setSuccess("");
         setSubmitting(true);
 
         try {
+            if (!canAddProcessor && drafts.length > 0) {
+                throw new Error("No se pudieron cargar definiciones de procesadores.");
+            }
+
+            let pipelineId = id;
             if (isEdit && id) {
                 await updatePipeline(id, { name, description });
             } else {
-                await createPipeline({ name, description });
+                const created = await createPipeline({ name, description });
+                pipelineId = created.id;
             }
+
+            if (pipelineId) {
+                await persistProcessors(pipelineId);
+            }
+
+            setSuccess("Pipeline guardado correctamente.");
             navigate("/pipelines");
         } catch (err) {
-            setError((err as Error).message || "Error al guardar pipeline");
+            setError((err as Error).message || "Error guardando pipeline");
         } finally {
             setSubmitting(false);
         }
     }
 
-    if (loadingItem) return <LoadingState message="Cargando pipeline…" />;
+    if (loadingItem || (isEdit && processorsLoading)) {
+        return <LoadingState message="Cargando pipeline…" />;
+    }
 
     return (
-        <main className="flex flex-col h-full overflow-hidden">
-            {/* Top bar */}
-            <div className="flex items-center gap-4 border-b border-border bg-background px-6 py-4 shrink-0">
+        <main className="flex h-full flex-col overflow-hidden">
+            <div className="flex shrink-0 items-center gap-4 border-b border-border bg-background px-6 py-4">
                 <button
                     onClick={() => navigate("/pipelines")}
                     className="rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30"
@@ -229,12 +263,9 @@ export default function PipelineFormPage() {
                 </h1>
             </div>
 
-            {/* Form */}
             <div className="flex-1 overflow-y-auto p-6">
-                <div className="mx-auto max-w-2xl">
+                <div className="mx-auto max-w-3xl">
                     <form onSubmit={handleSubmit} className="space-y-5">
-
-                        {/* Name */}
                         <div className="space-y-1">
                             <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
                                 Nombre
@@ -242,13 +273,11 @@ export default function PipelineFormPage() {
                             <input
                                 className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent"
                                 value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="ej. syslog-normalize"
+                                onChange={(event) => setName(event.target.value)}
                                 required
                             />
                         </div>
 
-                        {/* Description */}
                         <div className="space-y-1">
                             <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
                                 Descripción
@@ -257,64 +286,76 @@ export default function PipelineFormPage() {
                                 className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent"
                                 rows={2}
                                 value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Describe qué hace este pipeline…"
+                                onChange={(event) => setDescription(event.target.value)}
                             />
                         </div>
 
-                        {/* Processors */}
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <span className="block text-xs font-semibold uppercase tracking-wider text-muted">
-                                        Procesadores (en orden)
+                                        Procesadores (flujo)
                                     </span>
-                                    {usingFallback && (
-                                        <span className="text-xs text-muted/70">
-                                            Tipos por defecto — <code className="font-mono">GET /processors</code> no disponible
-                                        </span>
-                                    )}
+                                    <p className="text-xs text-muted/80">
+                                        Reordena con ↑/↓ para definir el flujo de transformación.
+                                    </p>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={addProcessor}
-                                    disabled={defsLoading || processorDefs.length === 0}
+                                    disabled={!canAddProcessor || submitting}
                                     className="rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30 disabled:opacity-40"
                                 >
                                     + Añadir procesador
                                 </button>
                             </div>
 
-                            {defsLoading ? (
-                                <p className="text-xs text-muted">Cargando tipos de procesadores…</p>
+                            {definitionsError ? (
+                                <p className="rounded bg-error/20 px-3 py-2 text-sm text-error">
+                                    {definitionsError}
+                                </p>
+                            ) : null}
+                            {processorsError ? (
+                                <p className="rounded bg-error/20 px-3 py-2 text-sm text-error">
+                                    {processorsError}
+                                </p>
+                            ) : null}
+
+                            {drafts.length === 0 ? (
+                                <p className="rounded border border-border/70 p-3 text-sm text-muted">
+                                    Sin procesadores. Usa “Añadir procesador”.
+                                </p>
                             ) : (
                                 <div className="space-y-2">
-                                    {drafts.map((draft, idx) => (
-                                        <ProcessorRow
-                                            key={idx}
-                                            index={idx}
+                                    {drafts.map((draft, index) => (
+                                        <PipelineProcessorRow
+                                            key={draft.id ?? `${draft.type}-${index}`}
+                                            index={index}
                                             draft={draft}
-                                            definitions={processorDefs}
-                                            canRemove={drafts.length > 1}
-                                            onTypeChange={(type) => updateType(idx, type)}
-                                            onConfigChange={(cfg) => updateConfig(idx, cfg)}
-                                            onRemove={() => removeProcessor(idx)}
+                                            definitions={definitions}
+                                            disabled={submitting}
+                                            canMoveUp={index > 0}
+                                            canMoveDown={index < drafts.length - 1}
+                                            canRemove={drafts.length > 0}
+                                            onMoveUp={() => moveProcessor(index, -1)}
+                                            onMoveDown={() => moveProcessor(index, 1)}
+                                            onRemove={() => removeProcessor(index)}
+                                            onTypeChange={(type) => handleTypeChange(index, type)}
+                                            onConfigChange={(config) =>
+                                                handleConfigChange(index, config)
+                                            }
                                         />
                                     ))}
                                 </div>
                             )}
-
-                            <p className="text-xs text-muted/60">
-                                Los procesadores se persistirán cuando el endpoint{" "}
-                                <code className="font-mono">POST /pipelines/:id/processors</code> esté disponible.
-                            </p>
                         </div>
 
-                        {error && (
-                            <p className="rounded bg-error/20 px-3 py-2 text-sm text-error">
-                                {error}
-                            </p>
-                        )}
+                        {error ? (
+                            <p className="rounded bg-error/20 px-3 py-2 text-sm text-error">{error}</p>
+                        ) : null}
+                        {success ? (
+                            <p className="rounded bg-accent/20 px-3 py-2 text-sm text-accent">{success}</p>
+                        ) : null}
 
                         <div className="flex gap-3 pt-2">
                             <button

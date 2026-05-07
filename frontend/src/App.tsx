@@ -7,6 +7,9 @@ import MappingsPage from "./pages/MappingsPage";
 import PipelineDetailPage from "./pages/PipelineDetailPage";
 import PipelineFormPage from "./pages/PipelineFormPage";
 import PipelinesPage from "./pages/PipelinesPage";
+import RuleAlertsPage from "./pages/RuleAlertsPage";
+import RuleFormPage from "./pages/RuleFormPage";
+import RulesPage from "./pages/RulesPage";
 import SourceDetailPage from "./pages/SourceDetailPage";
 import SourceFormPage from "./pages/SourceFormPage";
 import SourcesPage from "./pages/SourcesPage";
@@ -37,6 +40,12 @@ export default function App() {
                 <Route path="/pipelines/new" element={<PipelineFormPage />} />
                 <Route path="/pipelines/:id" element={<PipelineDetailPage />} />
                 <Route path="/pipelines/:id/edit" element={<PipelineFormPage />} />
+
+                {/* Rules */}
+                <Route path="/rules" element={<RulesPage />} />
+                <Route path="/rules/new" element={<RuleFormPage />} />
+                <Route path="/rules/:id/edit" element={<RuleFormPage />} />
+                <Route path="/rules/alerts" element={<RuleAlertsPage />} />
 
                 <Route path="*" element={<Navigate to="/logs" replace />} />
             </Route>

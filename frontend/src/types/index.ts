@@ -1,7 +1,7 @@
 export type LogEntry = {
     _row_key: string;
     timestamp: string;
-    sourceid: string;
+    sourceid: string | number;
     data: Record<string, unknown>;
 };
 
@@ -38,21 +38,80 @@ export type Pipeline = {
     description: string;
 };
 
-/**
- * A processor type definition returned by GET /processors.
- * `config` maps each config field name to its value type ("string", "number", "boolean").
- */
+export type DynamicFieldType =
+    | "string"
+    | "number"
+    | "boolean"
+    | "uuid"
+    | "json"
+    | "array";
+
+export interface DynamicSchema {
+    [key: string]: DynamicFieldType | DynamicSchema;
+}
+
 export type ProcessorDefinition = {
     id: string;
     name: string;
     description: string;
-    config: Record<string, string>;
+    schema: DynamicSchema;
 };
 
 /** Client-side draft of a single processor inside a pipeline form */
 export type PipelineProcessorDraft = {
+    id?: string;
     type: string;
     config: Record<string, unknown>;
+};
+
+export type PipelineProcessor = {
+    id: string;
+    pipelineid: string;
+    type: string;
+    config: Record<string, unknown>;
+};
+
+// ── Rules ────────────────────────────────────────────────────────────────────
+
+export type RuleSeverity = "low" | "medium" | "high" | "critical";
+
+export type RuleType =
+    | "threshold"
+    | "match"
+    | "correlation"
+    | "aggregation"
+    | "temporal"
+    | string;
+
+export type RuleDefinition = {
+    type: RuleType;
+    label: string;
+    description: string;
+    schema: DynamicSchema;
+};
+
+export type Rule = {
+    id: string;
+    name: string;
+    description: string;
+    enabled: boolean;
+    type: RuleType;
+    severity: RuleSeverity;
+    config: Record<string, unknown>;
+    last_execution_at: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type RuleAlert = {
+    id: string;
+    timestamp: string;
+    rule_id: string;
+    rule_name: string;
+    severity: RuleSeverity;
+    message: string;
+    status: "open" | "acknowledged" | "resolved" | string;
+    details: Record<string, unknown>;
 };
 
 // ── Mapping (global) ─────────────────────────────────────────────────────────

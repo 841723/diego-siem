@@ -1,9 +1,14 @@
 import type {
+    DynamicSchema,
     LogEntry,
     MappingField,
     MappingType,
     Pipeline,
+    PipelineProcessor,
     ProcessorDefinition,
+    Rule,
+    RuleAlert,
+    RuleDefinition,
     SourceConfig,
 } from "../types";
 
@@ -13,6 +18,42 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${API_BASE}${path}`, init);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json() as Promise<T>;
+}
+
+function normalizeSchema(input: unknown): DynamicSchema {
+    if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+    const schema: DynamicSchema = {};
+    for (const [key, value] of Object.entries(input)) {
+        if (
+            value === "string" ||
+            value === "number" ||
+            value === "boolean" ||
+            value === "uuid" ||
+            value === "json" ||
+            value === "array"
+        ) {
+            schema[key] = value;
+            continue;
+        }
+        if (typeof value === "string") {
+            const lowered = value.toLowerCase();
+            schema[key] =
+                lowered === "integer" || lowered === "float" || lowered === "int"
+                    ? "number"
+                    : lowered === "bool"
+                      ? "boolean"
+                      : lowered === "object"
+                        ? "json"
+                        : lowered === "[]string" || lowered === "list"
+                          ? "array"
+                          : lowered === "uuid"
+                            ? "uuid"
+                            : "string";
+            continue;
+        }
+        schema[key] = normalizeSchema(value);
+    }
+    return schema;
 }
 
 // ── Sources ──────────────────────────────────────────────────────────────────
@@ -75,7 +116,7 @@ function normalizeLogs(payload: unknown): LogEntry[] {
 }
 
 export async function getLogs(
-    sourceId: string,
+    sourceId: string | number,
     timeWindow: string,
     from: number,
     size: number,
@@ -129,13 +170,124 @@ export async function deletePipeline(id: string): Promise<void> {
     await request<void>(`/pipelines/${id}`, { method: "DELETE" });
 }
 
-// ── Processor definitions (GET /processors) ──────────────────────────────────
-// NOTE: This endpoint is not yet implemented in the backend.
-// The hook useProcessors falls back to hardcoded definitions when this returns 404.
-
 export async function getProcessors(): Promise<ProcessorDefinition[]> {
-    const payload = await request<ProcessorDefinition[]>("/processors");
-    return Array.isArray(payload) ? payload : [];
+    const payload = await request<
+        Array<{
+            id: string;
+            name: string;
+            description?: string;
+            schema?: unknown;
+            config?: unknown;
+        }>
+    >("/processors");
+    if (!Array.isArray(payload)) return [];
+    return payload.map((processor) => ({
+        id: processor.id,
+        name: processor.name,
+        description: processor.description ?? "",
+        schema: normalizeSchema(processor.schema ?? processor.config ?? {}),
+    }));
+}
+
+function parseProcessorConfig(config: unknown): Record<string, unknown> {
+    if (typeof config === "string") {
+        try {
+            const parsed = JSON.parse(config) as unknown;
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+                ? (parsed as Record<string, unknown>)
+                : {};
+        } catch {
+            return {};
+        }
+    }
+    if (config && typeof config === "object" && !Array.isArray(config)) {
+        return config as Record<string, unknown>;
+    }
+    return {};
+}
+
+export async function getPipelineProcessors(
+    pipelineId: string,
+): Promise<PipelineProcessor[]> {
+    const payload = await request<
+        Array<{
+            id: string;
+            pipelineid: string;
+            type?: string;
+            processorid?: string;
+            config: unknown;
+        }>
+    >(`/pipelines/${pipelineId}/processors`);
+    if (!Array.isArray(payload)) return [];
+    return payload.map((processor) => ({
+        id: processor.id,
+        pipelineid: processor.pipelineid,
+        type: processor.type ?? processor.processorid ?? "",
+        config: parseProcessorConfig(processor.config),
+    }));
+}
+
+type PipelineProcessorPayload = {
+    type: string;
+    processorid?: string;
+    config: Record<string, unknown>;
+    position?: number;
+};
+
+export async function createPipelineProcessor(
+    pipelineId: string,
+    processor: PipelineProcessorPayload,
+): Promise<PipelineProcessor> {
+    const payload = await request<{
+        id: string;
+        pipelineid: string;
+        type?: string;
+        processorid?: string;
+        config: unknown;
+    }>(`/pipelines/${pipelineId}/processors`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(processor),
+    });
+    return {
+        id: payload.id,
+        pipelineid: payload.pipelineid,
+        type: payload.type ?? payload.processorid ?? processor.type,
+        config: parseProcessorConfig(payload.config),
+    };
+}
+
+export async function updatePipelineProcessor(
+    pipelineId: string,
+    processorId: string,
+    processor: PipelineProcessorPayload,
+): Promise<PipelineProcessor> {
+    const payload = await request<{
+        id: string;
+        pipelineid: string;
+        type?: string;
+        processorid?: string;
+        config: unknown;
+    }>(`/pipelines/${pipelineId}/processors/${processorId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(processor),
+    });
+    return {
+        id: payload.id,
+        pipelineid: payload.pipelineid,
+        type: payload.type ?? payload.processorid ?? processor.type,
+        config: parseProcessorConfig(payload.config),
+    };
+}
+
+export async function deletePipelineProcessor(
+    pipelineId: string,
+    processorId: string,
+): Promise<void> {
+    await request<void>(`/pipelines/${pipelineId}/processors/${processorId}`, {
+        method: "DELETE",
+    });
 }
 
 // ── Global Mapping (GET /mappings, POST /mappings) ────────────────────────────
@@ -157,11 +309,66 @@ export async function setGlobalMapping(fields: MappingField[]): Promise<void> {
     });
 }
 
-// ── Mapping types (GET /mappings/types) ───────────────────────────────────────
-// NOTE: This endpoint is not yet implemented in the backend.
-// The hook useMappingTypes falls back to hardcoded types when this returns 404.
-
 export async function getMappingTypes(): Promise<MappingType[]> {
     const payload = await request<MappingType[]>("/mappings/types");
+    return Array.isArray(payload) ? payload : [];
+}
+
+// ── Rules ─────────────────────────────────────────────────────────────────────
+
+export async function getRuleDefinitions(): Promise<RuleDefinition[]> {
+    const payload = await request<
+        Array<{
+            type: string;
+            label?: string;
+            description?: string;
+            schema?: unknown;
+        }>
+    >("/rules/types");
+    if (!Array.isArray(payload)) return [];
+    return payload.map((rule) => ({
+        type: rule.type,
+        label: rule.label ?? rule.type,
+        description: rule.description ?? "",
+        schema: normalizeSchema(rule.schema ?? {}),
+    }));
+}
+
+export async function getRules(): Promise<Rule[]> {
+    const payload = await request<Rule[]>("/rules");
+    return Array.isArray(payload) ? payload : [];
+}
+
+export async function getRule(id: string): Promise<Rule> {
+    return request<Rule>(`/rules/${id}`);
+}
+
+export async function createRule(
+    rule: Omit<Rule, "id" | "created_at" | "updated_at" | "last_execution_at">,
+): Promise<Rule> {
+    return request<Rule>("/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rule),
+    });
+}
+
+export async function updateRule(
+    id: string,
+    rule: Pick<Rule, "name" | "description" | "enabled" | "severity" | "type" | "config">,
+): Promise<Rule> {
+    return request<Rule>(`/rules/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rule),
+    });
+}
+
+export async function deleteRule(id: string): Promise<void> {
+    await request<void>(`/rules/${id}`, { method: "DELETE" });
+}
+
+export async function getRuleAlerts(): Promise<RuleAlert[]> {
+    const payload = await request<RuleAlert[]>("/rules/alerts");
     return Array.isArray(payload) ? payload : [];
 }
