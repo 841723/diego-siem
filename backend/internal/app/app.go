@@ -43,11 +43,14 @@ func (a *App) initAPI() {
 	// 	/schema
 	routes.SchemaRegisterRoutes(r, &a.storages)
 
-	// 	/pipelines
+	// 	/pipelines and /pipelines/:id/processors
 	routes.PipelinesRegisterRoutes(r, &a.storages)
 
 	// 	/mappings
 	routes.MappingRegisterRoutes(r, &a.storages)
+
+	// 	/processors
+	routes.ProcessorsRegisterRoutes(r, &a.storages)
 
 	r.Run(":8080")
 }

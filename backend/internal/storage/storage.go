@@ -145,6 +145,18 @@ func (s *Storage) DeleteProcessorFromPipeline(processorID model.ID) error {
 	return s.postgres.DeleteProcessorFromPipelineInDB(processorID)
 }
 
+func (s *Storage) GetProcessorsByPipelineID(pipelineID model.ID) ([]model.PipelineProcessor, error) {
+	return s.postgres.GetProcessorsByPipelineIDFromDB(pipelineID)
+}
+
+func (s *Storage) GetAllProcessors() ([]model.Processor, error) {
+	return s.postgres.GetProcessorsFromDB()
+}
+
+func (s *Storage) GetProcessorsByID(pipelineID model.ID) ([]model.Processor, error) {
+	return s.postgres.GetProcessorsByIDFromDB(pipelineID)
+}
+
 /*
 *********************************************************
 

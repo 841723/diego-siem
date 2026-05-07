@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 )
+
 type LogData = map[string]interface{}
 
 type Log struct {
@@ -44,6 +45,8 @@ type PipelineProcessor struct {
 	PipelineID  ID                      `json:"pipelineid"`
 	ProcessorID ID                      `json:"processorid"`
 	Config      PipelineProcessorConfig `json:"config"` // JSON configuration specific to this processor in the pipeline
+	Pipeline    Pipeline
+	Processor   Processor
 }
 
 type MappingType struct {
@@ -77,4 +80,9 @@ type GetLogsParams struct {
 type ColumnRequest struct {
 	ColumnName string `json:"column_name"`
 	DataType   string `json:"data_type"`
+}
+
+type FullPipelineResponse struct {
+	Pipeline   Pipeline            `json:"pipeline"`
+	Processors []PipelineProcessor `json:"processors"`
 }

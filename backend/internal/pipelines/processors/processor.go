@@ -12,7 +12,7 @@ func Process(p model.PipelineProcessor, logData *model.LogData) error {
 	var processor Processor
 	var err error
 
-	switch p.Type {
+	switch p.Processor.Name {
 	case "set":
 		processor, err = NewSetProcessor(p.Config)
 	case "delete":

@@ -61,6 +61,37 @@ func (h *PipelinesHandler) GetPipelineByID(c *gin.Context) {
 	c.JSON(200, pipeline)
 }
 
+func (h *PipelinesHandler) GetFullPipelineByID(c *gin.Context) {
+	strId := c.Param("id")
+	id, err := model.ParseAndCheckUUID(strId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid pipeline ID"})
+		return
+	}
+	pipeline, err := h.storage.GetPipelineByID(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if pipeline == nil {
+		c.JSON(http.StatusNoContent, gin.H{"error": "Pipeline not found"})
+		return
+	}
+
+	processors, err := h.storage.GetProcessorsByPipelineID(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	fullPipeline := model.FullPipelineResponse{
+		Pipeline:   *pipeline,
+		Processors: processors,
+	}
+
+	c.JSON(200, fullPipeline)
+}
+
 func (h *PipelinesHandler) UpdatePipeline(c *gin.Context) {
 	strId := c.Param("id")
 	id, err := model.ParseAndCheckUUID(strId)
@@ -118,10 +149,11 @@ func PipelinesRegisterRoutes(r *gin.Engine, storage *storage.Storage) {
 	pipelinesGroup.POST("", handler.AddPipeline)
 	pipelinesGroup.GET("", handler.GetPipelines)
 	pipelinesGroup.GET("/:id", handler.GetPipelineByID)
+	pipelinesGroup.GET("/:id/full", handler.GetFullPipelineByID)
 	pipelinesGroup.PUT("/:id", handler.UpdatePipeline)
 	pipelinesGroup.DELETE("", handler.ClearPipelines)
 	pipelinesGroup.DELETE("/:id", handler.ClearPipelineByID)
 
 	processorsGroup := pipelinesGroup.Group("/:id/processors")
-	ProcessorsRegisterRoutes(r, processorsGroup, storage)
+	PipelineProcessorsRegisterRoutes(r, processorsGroup, storage)
 }
