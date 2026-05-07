@@ -1,7 +1,7 @@
 export type LogEntry = {
     _row_key: string;
     timestamp: string;
-    sourceid: string | number;
+    sourceid: string;
     data: Record<string, unknown>;
 };
 

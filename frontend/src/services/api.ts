@@ -116,7 +116,7 @@ function normalizeLogs(payload: unknown): LogEntry[] {
 }
 
 export async function getLogs(
-    sourceId: string | number,
+    sourceId: string,
     timeWindow: string,
     from: number,
     size: number,

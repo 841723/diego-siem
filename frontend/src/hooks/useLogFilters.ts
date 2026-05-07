@@ -172,7 +172,7 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
 
     const filteredLogs = useMemo(() => {
         return logs.filter((log) => {
-            if (sourceId !== null && log.sourceid !== sourceId) return false;
+            if (sourceId !== null && String(log.sourceid) !== String(sourceId)) return false;
 
             // if (window.ms !== null) {
             //     if (toTimestampMs(log.timestamp) < now - window.ms)
