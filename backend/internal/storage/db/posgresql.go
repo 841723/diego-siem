@@ -317,6 +317,45 @@ func (db *PostgreSQLDB) DeletePipelineByIDFromDB(pipelineID model.ID) error {
 	return err
 }
 
+func (db *PostgreSQLDB) GetSubPipelinesFromDB(pipelineID model.ID) ([]model.ID, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := db.pool.Query(ctx, `
+		select *
+		from pipelineprocessor p 
+		join (
+			select id 
+			from processor 
+			where name LIKE 'Call Pipeline'
+			) p2 
+		on p.processorid = p2.id 
+		where p.pipelineid = $1
+	`, pipelineID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subPipelineIDs []model.ID
+
+	for rows.Next() {
+		var processorID model.ID
+
+		err := rows.Scan(&processorID)
+		if err != nil {
+			return nil, err
+		}
+
+		subPipelineIDs = append(subPipelineIDs, processorID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return subPipelineIDs, nil
+}
+
 /*
 ******************************************************
 
@@ -481,9 +520,11 @@ func (db *PostgreSQLDB) GetProcessorsFromPipelineInDB(pipelineID model.ID) ([]mo
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	rows, err := db.pool.Query(ctx, `
-		SELECT id, pipelineid, processorid, config
+		SELECT pipelineprocessor.id, pipelineprocessor.pipelineid, pipelineprocessor.processorid, pipelineprocessor.config, processor.id, processor.name, processor.description, processor.schema, pipeline.id, pipeline.name, pipeline.description
 		FROM pipelineprocessor
-		WHERE pipelineid = $1
+		JOIN processor ON pipelineprocessor.processorid = processor.id
+		JOIN pipeline ON pipelineprocessor.pipelineid = pipeline.id
+		WHERE pipelineprocessor.pipelineid = $1
 	`, pipelineID)
 	if err != nil {
 		return nil, err
@@ -500,6 +541,13 @@ func (db *PostgreSQLDB) GetProcessorsFromPipelineInDB(pipelineID model.ID) ([]mo
 			&p.PipelineID,
 			&p.ProcessorID,
 			&p.Config,
+			&p.Processor.ID,
+			&p.Processor.Name,
+			&p.Processor.Description,
+			&p.Processor.Schema,
+			&p.Pipeline.ID,
+			&p.Pipeline.Name,
+			&p.Pipeline.Description,
 		)
 		if err != nil {
 			return nil, err

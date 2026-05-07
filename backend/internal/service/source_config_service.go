@@ -15,9 +15,9 @@ import (
  * syslog/api -> parse -> (parsedCh) -> pipeline -> (storageCh) -> storage
  *
  */
-
 type SourceConfigRuntime struct {
-	Config model.SourceConfig
+	Config             model.SourceConfig
+	PipelineProcessors []model.PipelineProcessor
 
 	ParsedCh  chan model.Log
 	StorageCh chan model.Log
@@ -31,13 +31,20 @@ func (s *SourceManager) NewSourceConfigRuntime(cfg model.SourceConfig) model.ID 
 	storage_ch := make(chan model.Log, max_items_channels)
 	stop_ch := make(chan struct{})
 
+	pipeline, err := s.storage.GetProcessorsByPipelineID(cfg.PipelineID)
+	if err != nil || pipeline == nil {
+		// Handle error, for now we just return an empty pipeline
+		pipeline = []model.PipelineProcessor{}
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sources[cfg.ID.String()] = &SourceConfigRuntime{
-		Config:    cfg,
-		ParsedCh:  parsed_ch,
-		StorageCh: storage_ch,
-		StopChan:  stop_ch,
+		Config:             cfg,
+		PipelineProcessors: pipeline,
+		ParsedCh:           parsed_ch,
+		StorageCh:          storage_ch,
+		StopChan:           stop_ch,
 	}
 	return cfg.ID
 }
@@ -46,7 +53,7 @@ func (src *SourceConfigRuntime) waitAndProcessLogs(s *storage.Storage) {
 	for {
 		select {
 		case log := <-src.ParsedCh:
-			log, err := pipelines.ProcessLog(log, src.Config.PipelineID)
+			log, err := pipelines.ProcessLog(log, src.PipelineProcessors)
 			if err != nil {
 				// Handle error
 				continue
@@ -148,6 +155,19 @@ func (s *SourceManager) UpdateSource(cfg model.SourceConfig) (*model.SourceConfi
 	s.StartSource(id)
 
 	return &cfg, nil
+}
+
+func (s *SourceManager) UpdatePipelineInSourceConfig(updatedPipelineID model.ID) error {
+	for _, sourceRuntime := range s.sources {
+		if s.storage.SourceUsesPipeline(sourceRuntime.Config.PipelineID, updatedPipelineID) {
+			newPipeline, err := s.storage.GetProcessorsByPipelineID(sourceRuntime.Config.PipelineID)
+			if err != nil {
+				return err
+			}
+			sourceRuntime.PipelineProcessors = newPipeline
+		}
+	}
+	return nil
 }
 
 func (s *SourceManager) GetSources() ([]model.SourceConfig, error) {

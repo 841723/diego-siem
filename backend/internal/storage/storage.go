@@ -4,18 +4,22 @@ import (
 	"fmt"
 
 	"backend/internal/model"
+	"backend/internal/pipelines/processors"
 	"backend/internal/storage/db"
 )
 
 type Storage struct {
 	clickhouse *db.ClickHouseDB
 	postgres   *db.PostgreSQLDB
+
+	maxDepth int
 }
 
 func NewStorage() *Storage {
 	return &Storage{
 		clickhouse: db.NewClickHouseDB(),
 		postgres:   db.NewPostgreSQLDB(),
+		maxDepth:   2,
 	}
 }
 
@@ -122,6 +126,36 @@ func (s *Storage) DeletePipelineByID(pipelineID model.ID) error {
 	return s.postgres.DeletePipelineByIDFromDB(pipelineID)
 }
 
+func (s *Storage) SourceUsesPipeline(sourcePipelineID, updatedPipelineID model.ID) bool {
+	// true if sourcePipelineID == updatedPipelineID or if sourcePipelineID uses updatedPipelineID as a sub-pipeline
+	pipelinesAlreadyChecked := make(map[model.ID]struct{})
+
+	pipelinesToCheck := make(map[model.ID]struct{})
+	pipelinesToCheck[sourcePipelineID] = struct{}{}
+
+	for depth := 0; depth < s.maxDepth; depth++ {
+		for pipelineID := range pipelinesToCheck {
+			pipelinesAlreadyChecked[pipelineID] = struct{}{}
+
+			if pipelineID == updatedPipelineID {
+				return true
+			}
+			subPipelines, err := s.postgres.GetSubPipelinesFromDB(pipelineID)
+			if err != nil {
+				return false
+			}
+
+			for _, subPipelineID := range subPipelines {
+				if _, checked := pipelinesAlreadyChecked[subPipelineID]; !checked {
+					pipelinesToCheck[subPipelineID] = struct{}{}
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 /*********************************************************
 
 	Processors
@@ -146,7 +180,34 @@ func (s *Storage) DeleteProcessorFromPipeline(processorID model.ID) error {
 }
 
 func (s *Storage) GetProcessorsByPipelineID(pipelineID model.ID) ([]model.PipelineProcessor, error) {
-	return s.postgres.GetProcessorsByPipelineIDFromDB(pipelineID)
+	response, err := s.postgres.GetProcessorsByPipelineIDFromDB(pipelineID)
+	if err != nil {
+		return nil, err
+	}
+
+	for depth := 1; depth < s.maxDepth; depth++ {
+		var subProcessors []model.PipelineProcessor
+		for _, processor := range response {
+			if processor.Processor.Name == "Call Pipeline" {
+				parsedConfig, err := processors.NewCallPipelineProcessor(processor.Config)
+				if err != nil {
+					return nil, err
+				}
+				parsedPipelineID, err := model.ParseAndCheckUUID(parsedConfig.PipelineID)
+				if err != nil {
+					return nil, err
+				}
+				subPipelineProcessors, err := s.postgres.GetProcessorsByPipelineIDFromDB(parsedPipelineID)
+				if err != nil {
+					return nil, err
+				}
+				subProcessors = append(subProcessors, subPipelineProcessors...)
+			}
+		}
+		response = append(response, subProcessors...)
+	}
+
+	return response, nil
 }
 
 func (s *Storage) GetAllProcessors() ([]model.Processor, error) {
