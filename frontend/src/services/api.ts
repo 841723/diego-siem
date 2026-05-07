@@ -1,9 +1,13 @@
 import type {
+    FullPipeline,
     LogEntry,
     MappingField,
     MappingType,
     Pipeline,
+    PipelineProcessor,
     ProcessorDefinition,
+    Rule,
+    RuleAlert,
     SourceConfig,
 } from "../types";
 
@@ -12,7 +16,68 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${API_BASE}${path}`, init);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.json() as Promise<T>;
+    if (response.status === 204) return null as T;
+
+    const text = await response.text();
+    if (!text) return null as T;
+    return JSON.parse(text) as T;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        return value as Record<string, unknown>;
+    }
+    return {};
+}
+
+function normalizeProcessorDefinition(raw: unknown): ProcessorDefinition {
+    const item = asRecord(raw);
+    return {
+        id: String(item.id ?? ""),
+        name: String(item.name ?? ""),
+        description: String(item.description ?? ""),
+        schema: asRecord(item.schema ?? item.config),
+    };
+}
+
+function normalizePipelineProcessor(raw: unknown): PipelineProcessor {
+    const item = asRecord(raw);
+    const config = item.config;
+    let parsedConfig: Record<string, unknown> = {};
+
+    if (typeof config === "string") {
+        try {
+            parsedConfig = asRecord(JSON.parse(config));
+        } catch {
+            parsedConfig = {};
+        }
+    } else {
+        parsedConfig = asRecord(config);
+    }
+
+    const processorRaw = item.processor;
+    const pipelineRaw = item.pipeline;
+
+    return {
+        id: String(item.id ?? ""),
+        pipelineid: String(item.pipelineid ?? ""),
+        processorid: String(item.processorid ?? ""),
+        config: parsedConfig,
+        processor:
+            typeof processorRaw === "object" && processorRaw !== null
+                ? normalizeProcessorDefinition(processorRaw)
+                : undefined,
+        pipeline:
+            typeof pipelineRaw === "object" && pipelineRaw !== null
+                ? {
+                      id: String(asRecord(pipelineRaw).id ?? ""),
+                      name: String(asRecord(pipelineRaw).name ?? ""),
+                      description: String(
+                          asRecord(pipelineRaw).description ?? "",
+                      ),
+                  }
+                : undefined,
+    };
 }
 
 // ── Sources ──────────────────────────────────────────────────────────────────
@@ -61,8 +126,7 @@ function normalizeLogs(payload: unknown): LogEntry[] {
     const raw: Array<Omit<LogEntry, "_row_key">> = Array.isArray(payload)
         ? (payload as Array<Omit<LogEntry, "_row_key">>)
         : Array.isArray((payload as { logs?: unknown[] })?.logs)
-          ? ((payload as { logs: Array<Omit<LogEntry, "_row_key">> }).logs ??
-            [])
+          ? ((payload as { logs: Array<Omit<LogEntry, "_row_key">> }).logs ?? [])
           : [];
 
     const seen = new Map<string, number>();
@@ -84,9 +148,9 @@ export async function getLogs(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            timeWindow: timeWindow,
-            from: from,
-            size: size,
+            timeWindow,
+            from,
+            size,
         }),
     });
     const { logs, total } = payload as { logs: unknown[]; total: number };
@@ -104,8 +168,23 @@ export async function getPipeline(id: string): Promise<Pipeline> {
     return request<Pipeline>(`/pipelines/${id}`);
 }
 
+export async function getPipelineFull(id: string): Promise<FullPipeline> {
+    const payload = await request<unknown>(`/pipelines/${id}/full`);
+    const data = asRecord(payload);
+    return {
+        pipeline: {
+            id: String(asRecord(data.pipeline).id ?? ""),
+            name: String(asRecord(data.pipeline).name ?? ""),
+            description: String(asRecord(data.pipeline).description ?? ""),
+        },
+        processors: Array.isArray(data.processors)
+            ? data.processors.map(normalizePipelineProcessor)
+            : [],
+    };
+}
+
 export async function createPipeline(
-    pipeline: Pick<Pipeline, "name" | "description">,
+    pipeline: Pick<Pipeline, "id" | "name" | "description">,
 ): Promise<Pipeline> {
     return request<Pipeline>("/pipelines", {
         method: "POST",
@@ -129,26 +208,64 @@ export async function deletePipeline(id: string): Promise<void> {
     await request<void>(`/pipelines/${id}`, { method: "DELETE" });
 }
 
-// ── Processor definitions (GET /processors) ──────────────────────────────────
-// NOTE: This endpoint is not yet implemented in the backend.
-// The hook useProcessors falls back to hardcoded definitions when this returns 404.
-
-export async function getProcessors(): Promise<ProcessorDefinition[]> {
-    const payload = await request<ProcessorDefinition[]>("/processors");
-    return Array.isArray(payload) ? payload : [];
+export async function getPipelineProcessors(
+    pipelineId: string,
+): Promise<PipelineProcessor[]> {
+    const payload = await request<unknown>(`/pipelines/${pipelineId}/processors`);
+    return Array.isArray(payload) ? payload.map(normalizePipelineProcessor) : [];
 }
 
-// ── Global Mapping (GET /mappings, POST /mappings) ────────────────────────────
+export async function createPipelineProcessor(
+    pipelineId: string,
+    processor: Pick<PipelineProcessor, "id" | "processorid" | "config">,
+): Promise<PipelineProcessor> {
+    const payload = await request<unknown>(`/pipelines/${pipelineId}/processors`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(processor),
+    });
+    return normalizePipelineProcessor(payload);
+}
+
+export async function updatePipelineProcessor(
+    pipelineId: string,
+    processorId: string,
+    processor: Pick<PipelineProcessor, "processorid" | "config">,
+): Promise<PipelineProcessor> {
+    const payload = await request<unknown>(
+        `/pipelines/${pipelineId}/processors/${processorId}`,
+        {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(processor),
+        },
+    );
+    return normalizePipelineProcessor(payload);
+}
+
+export async function deletePipelineProcessor(
+    pipelineId: string,
+    processorId: string,
+): Promise<void> {
+    await request<void>(`/pipelines/${pipelineId}/processors/${processorId}`, {
+        method: "DELETE",
+    });
+}
+
+// ── Processor definitions ─────────────────────────────────────────────────────
+
+export async function getProcessors(): Promise<ProcessorDefinition[]> {
+    const payload = await request<unknown>("/processors");
+    return Array.isArray(payload) ? payload.map(normalizeProcessorDefinition) : [];
+}
+
+// ── Global Mapping (GET /mappings, POST /mappings) ───────────────────────────
 
 export async function getGlobalMapping(): Promise<MappingField[]> {
     const payload = await request<MappingField[]>("/mappings");
     return Array.isArray(payload) ? payload : [];
 }
 
-/**
- * Replaces the entire global mapping.
- * Backend endpoint: POST /mappings  body: { Mapping: MappingField[] }
- */
 export async function setGlobalMapping(fields: MappingField[]): Promise<void> {
     await request<void>("/mappings", {
         method: "POST",
@@ -157,11 +274,49 @@ export async function setGlobalMapping(fields: MappingField[]): Promise<void> {
     });
 }
 
-// ── Mapping types (GET /mappings/types) ───────────────────────────────────────
-// NOTE: This endpoint is not yet implemented in the backend.
-// The hook useMappingTypes falls back to hardcoded types when this returns 404.
-
 export async function getMappingTypes(): Promise<MappingType[]> {
     const payload = await request<MappingType[]>("/mappings/types");
+    return Array.isArray(payload) ? payload : [];
+}
+
+// ── Rules & alerts ────────────────────────────────────────────────────────────
+
+export async function getRules(): Promise<Rule[]> {
+    const payload = await request<Rule[]>("/rules");
+    return Array.isArray(payload) ? payload : [];
+}
+
+export async function getRule(id: string): Promise<Rule> {
+    return request<Rule>(`/rules/${id}`);
+}
+
+export async function createRule(
+    rule: Omit<Rule, "id"> & { id?: string },
+): Promise<Rule> {
+    return request<Rule>("/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rule),
+    });
+}
+
+export async function updateRule(
+    id: string,
+    rule: Omit<Rule, "id">,
+): Promise<Rule> {
+    return request<Rule>(`/rules/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rule),
+    });
+}
+
+export async function deleteRule(id: string): Promise<void> {
+    await request<void>(`/rules/${id}`, { method: "DELETE" });
+}
+
+export async function getRuleAlerts(ruleId?: string): Promise<RuleAlert[]> {
+    const query = ruleId ? `?rule_id=${encodeURIComponent(ruleId)}` : "";
+    const payload = await request<RuleAlert[]>(`/rules/alerts${query}`);
     return Array.isArray(payload) ? payload : [];
 }

@@ -27,7 +27,11 @@ export default function PipelinesPage() {
 
     function handleDuplicate(pl: Pipeline) {
         navigate("/pipelines/new", {
-            state: { name: `${pl.name} (copia)`, description: pl.description },
+            state: {
+                name: `${pl.name} (copia)`,
+                description: pl.description,
+                fromPipelineId: pl.id,
+            },
         });
     }
 

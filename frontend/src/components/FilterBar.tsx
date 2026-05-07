@@ -4,8 +4,8 @@ import SourceSelector from "./SourceSelector";
 
 type Props = {
     sources: SourceConfig[];
-    selectedId: number | null;
-    onSelectSource: (id: number | null) => void;
+    selectedId: string | null;
+    onSelectSource: (id: string | null) => void;
 
     timeWindow: string;
     onTimeWindowChange: (v: string) => void;

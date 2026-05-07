@@ -11,7 +11,7 @@ import { useSources } from "../hooks/useSources";
 import type { SourceConfig } from "../types";
 
 export default function LogsPage() {
-    const { sources, loading: sourcesLoading } = useSources();
+    const { sources } = useSources();
     const sourceIds = sources.map((s) => s.id);
 
     const filters = useLogFilters(sourceIds);

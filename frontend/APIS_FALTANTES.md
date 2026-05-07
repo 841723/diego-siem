@@ -1,138 +1,160 @@
-# APIs faltantes / pendientes — frontend SIEM
+# APIS_FALTANTES — frontend SIEM
 
-Este documento refleja el estado actual de la integración frontend↔backend.
-Todos los IDs son UUIDs (string), no enteros.
-
----
-
-## ✅ Endpoints ya disponibles y consumidos
-
-| Método   | Ruta              | Descripción                                  |
-| -------- | ----------------- | -------------------------------------------- |
-| `GET`    | `/sources`        | Lista fuentes                                |
-| `POST`   | `/sources`        | Crea una fuente                              |
-| `GET`    | `/sources/:id`    | Detalle de una fuente                        |
-| `PUT`    | `/sources/:id`    | Actualiza una fuente                         |
-| `DELETE` | `/sources/:id`    | Elimina una fuente                           |
-| `POST`   | `/logs/:sourceId` | Consulta logs de una fuente (con paginación) |
-| `GET`    | `/pipelines`      | Lista pipelines                              |
-| `POST`   | `/pipelines`      | Crea un pipeline                             |
-| `GET`    | `/pipelines/:id`  | Detalle de un pipeline                       |
-| `PUT`    | `/pipelines/:id`  | Actualiza un pipeline                        |
-| `DELETE` | `/pipelines/:id`  | Elimina un pipeline                          |
-| `GET`    | `/mappings`       | Lee el mapping global (lista de campos)      |
-| `POST`   | `/mappings`       | Reemplaza el mapping global completo         |
+Este documento lista **solo** APIs faltantes en backend necesarias para cubrir completamente el frontend actual (incluyendo Pipelines y Rules).
 
 ---
 
-## ❌ Endpoints pendientes de implementar en el backend
+## 1) Rules (CRUD)
 
-### Procesadores de pipeline
+### 1.1 `GET /rules`
 
-#### `GET /processors`
-
-Devuelve los tipos de procesador disponibles con su esquema de configuración.
-El frontend usa una lista hardcodeada como fallback mientras este endpoint no exista.
-
-Response esperado:
+- **Descripción:** Lista reglas para la tabla principal de Rules.
+- **Request body:** No aplica.
+- **Response body (200):**
 
 ```json
 [
-    {
-        "id": "set",
-        "name": "set",
-        "description": "Establece un valor en un campo",
-        "config": {
-            "field": "string",
-            "value": "string"
-        }
+  {
+    "id": "uuid",
+    "name": "Failed login burst",
+    "description": "Detecta múltiples fallos de login",
+    "type": "threshold",
+    "enabled": true,
+    "severity": "high",
+    "config": {
+      "field": "failed_logins",
+      "operator": ">=",
+      "value": 5,
+      "window_minutes": 10
     },
-    {
-        "id": "drop",
-        "name": "drop",
-        "description": "Descarta el evento",
-        "config": {}
-    },
-    {
-        "id": "copy",
-        "name": "copy",
-        "description": "Copia un campo a otro",
-        "config": {
-            "source_field": "string",
-            "destination_field": "string"
-        }
+    "last_execution_at": "2026-05-07T18:00:00Z",
+    "created_at": "2026-05-07T17:00:00Z",
+    "updated_at": "2026-05-07T17:30:00Z"
+  }
+]
+```
+
+- **Errores posibles:** `500` (error interno).
+
+### 1.2 `GET /rules/:id`
+
+- **Descripción:** Obtiene una regla para edición/detalle.
+- **Request body:** No aplica.
+- **Response body (200):** mismo contrato de una regla.
+- **Errores posibles:** `400` (id inválido), `404` (no existe), `500`.
+
+### 1.3 `POST /rules`
+
+- **Descripción:** Crea una regla.
+- **Request body:**
+
+```json
+{
+  "id": "uuid",
+  "name": "Suspicious process",
+  "description": "Match por commandline",
+  "type": "match",
+  "enabled": true,
+  "severity": "medium",
+  "config": {
+    "field": "process.command_line",
+    "pattern": "powershell -enc",
+    "case_sensitive": false
+  }
+}
+```
+
+- **Response body (201):** regla creada (incluyendo timestamps).
+- **Errores posibles:** `400` (payload inválido), `409` (id/nombre duplicado), `500`.
+
+### 1.4 `PUT /rules/:id`
+
+- **Descripción:** Actualiza regla existente.
+- **Request body:** mismo contrato que `POST /rules` (sin necesidad de `id` en body).
+- **Response body (200):** regla actualizada.
+- **Errores posibles:** `400`, `404`, `409`, `500`.
+
+### 1.5 `DELETE /rules/:id`
+
+- **Descripción:** Elimina una regla.
+- **Request body:** No aplica.
+- **Response body (200):**
+
+```json
+{ "message": "Rule deleted successfully" }
+```
+
+- **Errores posibles:** `400`, `404`, `500`.
+
+---
+
+## 2) Alerts de reglas
+
+### 2.1 `GET /rules/alerts`
+
+- **Descripción:** Lista alertas generadas por reglas.
+- **Query params opcionales:** `rule_id=<uuid>`, `status=open|acknowledged|resolved`, `from=<RFC3339>`, `to=<RFC3339>`.
+- **Request body:** No aplica.
+- **Response body (200):**
+
+```json
+[
+  {
+    "id": "uuid",
+    "rule_id": "uuid",
+    "rule_name": "Failed login burst",
+    "timestamp": "2026-05-07T18:02:10Z",
+    "severity": "high",
+    "message": "8 failed logins in 5 minutes",
+    "status": "open",
+    "details": {
+      "source_ip": "10.0.0.12",
+      "host": "srv-auth-01",
+      "events": 8
     }
+  }
 ]
 ```
 
-#### `GET /pipelines/:id/processors`
-
-Devuelve los procesadores configurados para un pipeline concreto.
-Necesario para mostrarlos en la vista de detalle del pipeline.
-
-Response esperado:
-
-```json
-[
-    {
-        "id": "uuid",
-        "pipelineid": "uuid",
-        "type": "set",
-        "config": "{\"field\":\"host\",\"value\":\"unknown\"}"
-    }
-]
-```
-
-#### `POST /pipelines/:id/processors`
-
-Reemplaza la lista de procesadores de un pipeline.
-Necesario para persistir los procesadores desde el formulario de edición.
-
-Request:
-
-```json
-[
-    { "type": "set", "config": "{\"field\":\"host\",\"value\":\"unknown\"}" },
-    { "type": "lowercase", "config": "{\"field\":\"severity\"}" }
-]
-```
+- **Errores posibles:** `400` (filtros inválidos), `500`.
 
 ---
 
-### Tipos de campo del mapping
+## 3) Pipelines — gap funcional pendiente recomendado
 
-#### `GET /mappings/types`
+> El frontend ya usa `GET /processors`, `GET /pipelines/:id/full` y CRUD en `/pipelines/:id/processors`.
+> Sin embargo, para garantizar **reordenamiento determinista** de processors falta un contrato explícito de orden.
 
-Devuelve los tipos de campo disponibles para el mapping global.
-El frontend usa tipos hardcodeados como fallback mientras este endpoint no exista.
+### 3.1 `PUT /pipelines/:id/processors/reorder` (recomendado)
 
-Response esperado:
+- **Descripción:** Reordena processors sin borrar/recrear registros.
+- **Request body:**
 
 ```json
-[
-    { "id": "uuid-1", "type_name": "string" },
-    { "id": "uuid-2", "type_name": "integer" },
-    { "id": "uuid-3", "type_name": "decimal" },
-    { "id": "uuid-4", "type_name": "boolean" },
-    { "id": "uuid-5", "type_name": "date" },
-    { "id": "uuid-6", "type_name": "ip" },
-    { "id": "uuid-7", "type_name": "timestamp" }
-]
+{
+  "processor_ids": ["uuid-1", "uuid-2", "uuid-3"]
+}
 ```
 
+- **Response body (200):**
+
+```json
+{
+  "pipelineid": "uuid",
+  "processors": [
+    { "id": "uuid-1", "position": 1 },
+    { "id": "uuid-2", "position": 2 },
+    { "id": "uuid-3", "position": 3 }
+  ]
+}
+```
+
+- **Errores posibles:** `400` (ids inválidos/duplicados), `404` (pipeline o processor inexistente), `409` (lista inconsistente), `500`.
+
 ---
 
-### Alertas / Reglas (futuro)
+## 4) Notas de compatibilidad relevantes
 
-#### `GET /rules`, `POST /rules`, `PATCH /rules/:id`
-
-Para un módulo de alertas automáticas basadas en consultas sobre los logs.
-No hay página en el frontend todavía.
-
----
-
-## Notas
-
-- El campo `config` de `PipelineProcessor` es un JSON string serializado, no un objeto JSON.
-- El endpoint `POST /mappings` acepta `{ Mapping: [...] }` (objeto con clave `Mapping`) y reemplaza
-  **toda** la colección de campos del mapping global en una sola operación.
+- El backend actual usa UUID en entidades principales (`pipelines`, `processors`, `pipelineprocessors`, `sources`, `mappings`).
+- `POST /mappings` actualmente recibe un array JSON plano (`[]`) y reemplaza el mapping completo.
+- `GET /processors` devuelve `schema` (JSON dinámico), que el frontend usa para renderizar formularios dinámicos.
