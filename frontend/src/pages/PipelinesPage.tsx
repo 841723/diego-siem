@@ -64,7 +64,7 @@ export default function PipelinesPage() {
         }
     }
 
-    async function openCreateDrawer(prefill?: Pipeline) {
+    async function openCreateOrDuplicateDrawer(prefill?: Pipeline) {
         setEditingItem(null);
         setName(prefill?.name ?? "");
         setDescription(prefill?.description ?? "");
@@ -119,12 +119,38 @@ export default function PipelinesPage() {
         );
     }
 
-    async function persistProcessorsOrder(pipelineId: string, orderedDrafts: DraftProcessor[]) {
+    async function syncPipelineProcessors(pipelineId: string, orderedDrafts: DraftProcessor[]) {
         const existing = await getPipelineProcessors(pipelineId);
+        const usedIds = new Set<string>();
         await updatePipelineProcessor(
             pipelineId,
             orderedDrafts.map((draft, index) => ({
-                id: draft.serverId ?? existing[index]?.id ?? crypto.randomUUID(),
+                id: (() => {
+                    if (draft.serverId) {
+                        usedIds.add(draft.serverId);
+                        return draft.serverId;
+                    }
+
+                    const byIndex = existing[index]?.id;
+                    if (byIndex && !usedIds.has(byIndex)) {
+                        usedIds.add(byIndex);
+                        return byIndex;
+                    }
+
+                    const byProcessor = existing.find(
+                        (candidate) =>
+                            candidate.processorid === draft.processorId &&
+                            !usedIds.has(candidate.id),
+                    )?.id;
+                    if (byProcessor) {
+                        usedIds.add(byProcessor);
+                        return byProcessor;
+                    }
+
+                    const generated = crypto.randomUUID();
+                    usedIds.add(generated);
+                    return generated;
+                })(),
                 processorid: draft.processorId,
                 config: draft.config,
             })),
@@ -151,7 +177,7 @@ export default function PipelinesPage() {
 
         if (editingItem) {
             try {
-                await persistProcessorsOrder(editingItem.id, currentDrafts);
+                await syncPipelineProcessors(editingItem.id, currentDrafts);
                 refetch();
             } catch (err) {
                 setActionError(
@@ -173,7 +199,7 @@ export default function PipelinesPage() {
                 await createPipeline({ id: pipelineId, name, description });
             }
 
-            await persistProcessorsOrder(pipelineId, drafts);
+            await syncPipelineProcessors(pipelineId, drafts);
             setDrawerOpen(false);
             refetch();
         } catch (err) {
@@ -200,7 +226,12 @@ export default function PipelinesPage() {
                 Editar
             </button>
             <button
-                onClick={() => openCreateDrawer({ ...pl, name: `${pl.name} (copia)` })}
+                onClick={() =>
+                    openCreateOrDuplicateDrawer({
+                        ...pl,
+                        name: `${pl.name} (copia)`,
+                    })
+                }
                 className='rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30'
             >
                 Duplicar
@@ -224,7 +255,7 @@ export default function PipelinesPage() {
                     </p>
                 </div>
                 <button
-                    onClick={() => openCreateDrawer()}
+                    onClick={() => openCreateOrDuplicateDrawer()}
                     className='rounded bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/80'
                 >
                     + Nuevo pipeline

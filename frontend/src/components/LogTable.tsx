@@ -19,6 +19,14 @@ const getCellValue = (
 };
 
 export default function LogTable({ loading = true, logs, columns }: Props) {
+    if (columns.length === 0) {
+        return (
+            <div className='rounded border border-border bg-surface/60 px-4 py-6 text-center text-sm text-muted'>
+                No hay columnas seleccionadas.
+            </div>
+        );
+    }
+
     // if (logs.length === 0) {
     //     return <EmptyState message="No hay logs para los criterios seleccionados" />;
     // }
@@ -155,5 +163,4 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
         </div>
     );
 }
-
 

@@ -23,6 +23,7 @@ export const TIME_WINDOWS: TimeWindow[] = [
 ];
 
 const DEFAULT_TIMEWINDOW = TIME_WINDOWS[2].value;
+const NO_COLUMNS_MARKER = "__NO_COLUMNS_SELECTED__";
 
 const TIMESTAMP_MS_THRESHOLD = 1_000_000_000_000;
 
@@ -86,6 +87,7 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
     const parseColumns = (): string[] => {
         const raw = searchParams.get("cols");
         if (!raw) return DEFAULT_COLUMNS;
+        if (raw === NO_COLUMNS_MARKER) return [];
         const cols = raw.split(",").filter(Boolean);
         return cols.length > 0 ? cols : DEFAULT_COLUMNS;
     };
@@ -138,7 +140,8 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
         requestSeq.current = requestId;
 
         setLogsLoading(true);
-        getLogs(sourceId, timeWindow, (page - 1) * FIXED_PAGE_SIZE, FIXED_PAGE_SIZE)
+        const offset = (page - 1) * FIXED_PAGE_SIZE;
+        getLogs(sourceId, timeWindow, offset, FIXED_PAGE_SIZE)
             .then(({ logs, total }) => {
                 if (requestSeq.current === requestId) {
                     setLogs(logs);
@@ -227,8 +230,10 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
             const next = columns.includes(col)
                 ? columns.filter((c) => c !== col)
                 : [...columns, col];
-            if (next.length === 0) return;
-            updateParams({ cols: next.join(","), page: "1" });
+            updateParams({
+                cols: next.length > 0 ? next.join(",") : NO_COLUMNS_MARKER,
+                page: "1",
+            });
             // eslint-disable-next-line react-hooks/exhaustive-deps
         },
         [columns],
