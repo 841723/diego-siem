@@ -46,7 +46,7 @@ export type ProcessorDefinition = {
     id: string;
     name: string;
     description: string;
-    humandescription?: string;
+    humanDescription?: string;
     schema: Record<string, unknown>;
 };
 

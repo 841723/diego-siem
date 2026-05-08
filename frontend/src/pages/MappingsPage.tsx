@@ -67,7 +67,12 @@ export default function MappingsPage() {
                         rows={tableRows}
                         emptyMessage='Sin campos definidos'
                         onRowClick={(rowIndex) =>
-                            navigate(`/mapping/${rowIndex}/edit`)
+                            navigate(
+                                `/mapping/${encodeURIComponent(
+                                    fields[rowIndex]?.fieldname ||
+                                        `field-${rowIndex}`,
+                                )}/edit`,
+                            )
                         }
                     />
                 )}

@@ -140,7 +140,8 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
         requestSeq.current = requestId;
 
         setLogsLoading(true);
-        const offset = (page - 1) * FIXED_PAGE_SIZE;
+        const safePage = Math.min(MAX_LOG_PAGES, Math.max(1, page));
+        const offset = (safePage - 1) * FIXED_PAGE_SIZE;
         getLogs(sourceId, timeWindow, offset, FIXED_PAGE_SIZE)
             .then(({ logs, total }) => {
                 if (requestSeq.current === requestId) {

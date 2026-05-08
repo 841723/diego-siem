@@ -426,7 +426,7 @@ export default function PipelineFormPage() {
                                 ))}
                             </select>
                             <p className='text-xs text-muted'>
-                                {selectedProcessorDef.humandescription ||
+                                {selectedProcessorDef.humanDescription ||
                                     selectedProcessorDef.description}
                             </p>
                         </div>
@@ -629,7 +629,7 @@ export default function PipelineFormPage() {
                                                                     processor.processorid}
                                                             </p>
                                                             <p className='text-xs text-muted'>
-                                                                {definition?.humandescription ||
+                                                                {definition?.humanDescription ||
                                                                     definition?.description ||
                                                                     "Sin descripción"}
                                                             </p>

@@ -57,12 +57,16 @@ export default function SourceFormPage() {
     }, [id, isEdit]);
 
     useEffect(() => {
-        if (form.pipelineid || pipelineOptions.length === 0) return;
-        setForm((prev) => ({
-            ...prev,
-            pipelineid: pipelineOptions[0].id,
-        }));
-    }, [form.pipelineid, pipelineOptions]);
+        if (pipelineOptions.length === 0) return;
+        setForm((prev) =>
+            prev.pipelineid
+                ? prev
+                : {
+                      ...prev,
+                      pipelineid: pipelineOptions[0].id,
+                  },
+        );
+    }, [pipelineOptions]);
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();

@@ -30,7 +30,15 @@ export default function MappingFormPage() {
     const [confirmDelete, setConfirmDelete] = useState(false);
 
     const isCreate = id === undefined;
-    const index = Number(id ?? "-1");
+    const decodedId = decodeURIComponent(id ?? "");
+    const index = useMemo(() => {
+        if (isCreate) return -1;
+        if (decodedId.startsWith("field-")) {
+            const parsed = Number(decodedId.slice("field-".length));
+            return Number.isNaN(parsed) ? -1 : parsed;
+        }
+        return fields.findIndex((field) => field.fieldname === decodedId);
+    }, [decodedId, fields, isCreate]);
 
     const effectiveTypes = mappingTypes.length
         ? mappingTypes
@@ -42,7 +50,7 @@ export default function MappingFormPage() {
             setDraft(createBlankField(defaultTypeId));
             return;
         }
-        if (Number.isNaN(index) || index < 0 || index >= fields.length) {
+        if (index < 0 || index >= fields.length) {
             setDraft(null);
             return;
         }
@@ -86,7 +94,7 @@ export default function MappingFormPage() {
     }
 
     async function handleDelete() {
-        if (isCreate || Number.isNaN(index) || index < 0 || index >= fields.length) {
+        if (isCreate || index < 0 || index >= fields.length) {
             return;
         }
         setSubmitting(true);
