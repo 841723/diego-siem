@@ -231,8 +231,8 @@ export async function getPipelineProcessors(
 export async function updatePipelineProcessor(
     pipelineId: string,
     processors: Array<Pick<PipelineProcessor, "id" | "processorid" | "config">>,
-): Promise<PipelineProcessor> {
-    const payload = await request<unknown>(
+): Promise<void> {
+    await request<unknown>(
         `/pipelines/${pipelineId}/processors`,
         {
             method: "PUT",
@@ -240,7 +240,6 @@ export async function updatePipelineProcessor(
             body: JSON.stringify(processors),
         },
     );
-    return normalizePipelineProcessor(payload);
 }
 
 export async function deletePipelineProcessor(

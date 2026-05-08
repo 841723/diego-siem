@@ -4,9 +4,6 @@ type Props = {
     onPageChange: (page: number) => void;
     shownCount: number;
     totalCount: number;
-    pageSize: number;
-    pageSizeOptions: readonly number[];
-    onPageSizeChange: (size: number) => void;
 };
 
 export default function Pagination({
@@ -15,10 +12,9 @@ export default function Pagination({
     onPageChange,
     shownCount,
     totalCount,
-    pageSize,
-    pageSizeOptions,
-    onPageSizeChange,
 }: Props) {
+    const pages = [1, 2, 3, 4, 5];
+
     return (
         <div className='flex items-center gap-3 text-sm text-muted w-full p-2 pt-0'>
             <p className='flex-1'>
@@ -30,41 +26,21 @@ export default function Pagination({
             </p>
 
             <div className='flex items-center gap-4'>
-                <label className='flex items-center gap-2'>
-                    Filas
-                    <select
-                        className='rounded border border-border bg-surface px-2 py-1 '
-                        value={pageSize}
-                        onChange={(e) =>
-                            onPageSizeChange(Number(e.target.value))
-                        }
-                    >
-                        {pageSizeOptions.map((s) => (
-                            <option key={s} value={s}>
-                                {s}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-
                 <div className='flex items-center gap-2'>
-                    <button
-                        className='rounded border border-border px-3 py-1 disabled:opacity-40 hover:border-border/80'
-                        disabled={currentPage <= 1}
-                        onClick={() => onPageChange(currentPage - 1)}
-                    >
-                        ‹
-                    </button>
-                    <span className='min-w-24 text-center '>
-                        Página {currentPage} / {totalPages}
-                    </span>
-                    <button
-                        className='rounded border border-border px-3 py-1 disabled:opacity-40 hover:border-border/80'
-                        disabled={currentPage >= totalPages}
-                        onClick={() => onPageChange(currentPage + 1)}
-                    >
-                        ›
-                    </button>
+                    {pages.map((page) => (
+                        <button
+                            key={page}
+                            className={`rounded border px-3 py-1 hover:border-border/80 ${
+                                page === currentPage
+                                    ? "border-accent bg-accent/20 text-text"
+                                    : "border-border"
+                            }`}
+                            disabled={page > totalPages}
+                            onClick={() => onPageChange(page)}
+                        >
+                            {page}
+                        </button>
+                    ))}
                 </div>
             </div>
         </div>

@@ -1,18 +1,37 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
 import ConfirmModal from "../components/ConfirmModal";
 import DataTable from "../components/DataTable";
+import Drawer from "../components/Drawer";
 import LoadingState from "../components/LoadingState";
 import { useSources } from "../hooks/useSources";
-import { deleteSource } from "../services/api";
+import { createSource, deleteSource, updateSource } from "../services/api";
 import type { SourceConfig } from "../types";
+
+type SourceForm = Omit<SourceConfig, "id">;
+
+const EMPTY_FORM: SourceForm = {
+    name: "",
+    port: 9001,
+    protocol: "udp",
+    parser: "syslog",
+    pipelineid: "",
+};
 
 export default function SourcesPage() {
     const { sources, loading, error, refetch } = useSources();
-    const navigate = useNavigate();
-
     const [confirmItem, setConfirmItem] = useState<SourceConfig | null>(null);
     const [actionError, setActionError] = useState("");
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [editingItem, setEditingItem] = useState<SourceConfig | null>(null);
+    const [form, setForm] = useState<SourceForm>(EMPTY_FORM);
+    const [saving, setSaving] = useState(false);
+
+    const isEdit = editingItem !== null;
+
+    const sortedSources = useMemo(
+        () => [...sources].sort((a, b) => a.name.localeCompare(b.name)),
+        [sources],
+    );
 
     async function handleDelete(src: SourceConfig) {
         try {
@@ -27,19 +46,47 @@ export default function SourcesPage() {
         }
     }
 
-    function handleDuplicate(src: SourceConfig) {
-        const { id: _id, ...rest } = src;
-        navigate("/sources/new", {
-            state: { ...rest, name: `${rest.name} (copia)` },
-        });
+    function openCreateDrawer() {
+        setEditingItem(null);
+        setForm(EMPTY_FORM);
+        setActionError("");
+        setDrawerOpen(true);
     }
 
-    const tableRows = sources
-        .sort((a, b) => a.id.localeCompare(b.id))
-        .map((src) => [
-            // <span className="font-mono text-xs text-muted">{src.id}</span>,
+    function openEditDrawer(src: SourceConfig) {
+        setEditingItem(src);
+        setForm({
+            name: src.name,
+            port: src.port,
+            protocol: src.protocol,
+            parser: src.parser,
+            pipelineid: src.pipelineid,
+        });
+        setActionError("");
+        setDrawerOpen(true);
+    }
+
+    async function handleSave() {
+        setSaving(true);
+        setActionError("");
+        try {
+            if (isEdit && editingItem) {
+                await updateSource(editingItem.id, form);
+            } else {
+                await createSource(form);
+            }
+            setDrawerOpen(false);
+            refetch();
+        } catch (err) {
+            setActionError((err as Error).message || "Error al guardar fuente");
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    const tableRows = sortedSources.map((src) => [
             <button
-                onClick={() => navigate(`/sources/${src.id}`)}
+                onClick={() => openEditDrawer(src)}
                 className='text-left text-sm text-muted hover:underline'
             >
                 {src.name}
@@ -52,13 +99,23 @@ export default function SourcesPage() {
             </span>,
             <div className='flex gap-1.5'>
                 <button
-                    onClick={() => navigate(`/sources/${src.id}/edit`)}
+                    onClick={() => openEditDrawer(src)}
                     className='rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30'
                 >
                     Editar
                 </button>
                 <button
-                    onClick={() => handleDuplicate(src)}
+                    onClick={() => {
+                        setEditingItem(null);
+                        setForm({
+                            name: `${src.name} (copia)`,
+                            port: src.port,
+                            protocol: src.protocol,
+                            parser: src.parser,
+                            pipelineid: src.pipelineid,
+                        });
+                        setDrawerOpen(true);
+                    }}
                     className='rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30'
                 >
                     Duplicar
@@ -85,7 +142,7 @@ export default function SourcesPage() {
                     </p>
                 </div>
                 <button
-                    onClick={() => navigate("/sources/new")}
+                    onClick={openCreateDrawer}
                     className='rounded bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/80'
                 >
                     + Nueva fuente
@@ -117,6 +174,121 @@ export default function SourcesPage() {
                     />
                 )}
             </div>
+
+            <Drawer
+                open={drawerOpen}
+                title={isEdit ? "Editar fuente" : "Crear fuente"}
+                onClose={() => setDrawerOpen(false)}
+                footer={
+                    <div className='flex justify-end gap-3'>
+                        <button
+                            className='rounded border border-border px-4 py-2 text-sm text-muted hover:bg-primary/30'
+                            onClick={() => setDrawerOpen(false)}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            className='rounded bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/80 disabled:opacity-50'
+                            disabled={saving || !form.name.trim()}
+                            onClick={handleSave}
+                        >
+                            {saving ? "Guardando…" : "Guardar"}
+                        </button>
+                    </div>
+                }
+            >
+                <div className='space-y-4'>
+                    <div className='space-y-1'>
+                        <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                            Nombre
+                        </label>
+                        <input
+                            className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                            value={form.name}
+                            onChange={(event) =>
+                                setForm((prev) => ({
+                                    ...prev,
+                                    name: event.target.value,
+                                }))
+                            }
+                            required
+                        />
+                    </div>
+
+                    <div className='space-y-1'>
+                        <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                            Puerto UDP
+                        </label>
+                        <input
+                            type='number'
+                            min={1}
+                            max={65535}
+                            className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                            value={form.port}
+                            onChange={(event) =>
+                                setForm((prev) => ({
+                                    ...prev,
+                                    port: Number(event.target.value),
+                                }))
+                            }
+                        />
+                    </div>
+
+                    <div className='space-y-1'>
+                        <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                            Protocolo
+                        </label>
+                        <input
+                            className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                            value={form.protocol}
+                            onChange={(event) =>
+                                setForm((prev) => ({
+                                    ...prev,
+                                    protocol: event.target.value,
+                                }))
+                            }
+                        />
+                    </div>
+
+                    <div className='space-y-1'>
+                        <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                            Parser
+                        </label>
+                        <input
+                            className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                            value={form.parser}
+                            onChange={(event) =>
+                                setForm((prev) => ({
+                                    ...prev,
+                                    parser: event.target.value,
+                                }))
+                            }
+                        />
+                    </div>
+
+                    <div className='space-y-1'>
+                        <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                            Pipeline ID
+                        </label>
+                        <input
+                            className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                            value={form.pipelineid}
+                            onChange={(event) =>
+                                setForm((prev) => ({
+                                    ...prev,
+                                    pipelineid: event.target.value,
+                                }))
+                            }
+                        />
+                    </div>
+
+                    {actionError && (
+                        <p className='rounded bg-error/20 px-3 py-2 text-sm text-error'>
+                            {actionError}
+                        </p>
+                    )}
+                </div>
+            </Drawer>
 
             <ConfirmModal
                 open={confirmItem !== null}

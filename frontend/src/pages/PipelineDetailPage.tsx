@@ -154,12 +154,14 @@ export default function PipelineDetailPage() {
                                 </p>
                             ) : (
                                 <div className="space-y-2">
-                                    {pipeline.processors.map((item, index) => (
+                                    {[...pipeline.processors]
+                                        .sort((a, b) => a.order - b.order)
+                                        .map((item, index) => (
                                         <div key={item.id}>
                                             <div className="rounded border border-border bg-surface p-3">
                                                 <div className="mb-1 flex items-center gap-2">
                                                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted">
-                                                        {index + 1}
+                                                        {item.order + 1}
                                                     </span>
                                                     <span className="text-sm font-semibold text-text">
                                                         {item.processor?.name ??

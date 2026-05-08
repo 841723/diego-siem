@@ -1,80 +1,18 @@
-import { type FormEvent, useState } from "react";
+import { useMemo, useState } from "react";
 import ConfirmModal from "../components/ConfirmModal";
+import DataTable from "../components/DataTable";
+import Drawer from "../components/Drawer";
 import LoadingState from "../components/LoadingState";
 import {
     FALLBACK_MAPPING_TYPES,
     useGlobalMapping,
 } from "../hooks/useGlobalMapping";
 import { setGlobalMapping } from "../services/api";
-import type { MappingField, MappingType } from "../types";
+import type { MappingField } from "../types";
 
-// ── Blank field helper ────────────────────────────────────────────────────────
-function blankField(mappingTypes: MappingType[]): MappingField {
-    const firstType = mappingTypes[0] ?? FALLBACK_MAPPING_TYPES[0];
-    return { fieldname: "", fieldtypeid: firstType.id, defaultvalue: "" };
+function blankField(typeId: string): MappingField {
+    return { fieldname: "", fieldtypeid: typeId, defaultvalue: "" };
 }
-
-// ── Inline field row ──────────────────────────────────────────────────────────
-type FieldRowProps = {
-    field: MappingField;
-    mappingTypes: MappingType[];
-    onChange: (updated: MappingField) => void;
-    onDelete: () => void;
-};
-
-function FieldRow({ field, mappingTypes, onChange, onDelete }: FieldRowProps) {
-    return (
-        <tr className='border-b border-border last:border-0 hover:bg-primary/10'>
-            <td className='px-3 py-2'>
-                <input
-                    className='w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent'
-                    value={field.fieldname}
-                    onChange={(e) =>
-                        onChange({ ...field, fieldname: e.target.value })
-                    }
-                    placeholder='nombredelcampo'
-                    required
-                />
-            </td>
-            <td className='px-3 py-2'>
-                <select
-                    className='w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent'
-                    value={field.fieldtypeid}
-                    onChange={(e) =>
-                        onChange({ ...field, fieldtypeid: e.target.value })
-                    }
-                >
-                    {mappingTypes.map((t) => (
-                        <option key={t.id} value={t.id}>
-                            {t.displayname}
-                        </option>
-                    ))}
-                </select>
-            </td>
-            <td className='px-3 py-2'>
-                <input
-                    className='w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent'
-                    value={field.defaultvalue}
-                    onChange={(e) =>
-                        onChange({ ...field, defaultvalue: e.target.value })
-                    }
-                    placeholder='(opcional)'
-                />
-            </td>
-            <td className='px-3 py-2 text-right'>
-                <button
-                    type='button'
-                    onClick={onDelete}
-                    className='rounded border border-error/50 px-2 py-0.5 text-xs text-error hover:bg-error/10'
-                >
-                    Eliminar
-                </button>
-            </td>
-        </tr>
-    );
-}
-
-// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function MappingsPage() {
     const {
@@ -86,39 +24,99 @@ export default function MappingsPage() {
         refetch,
     } = useGlobalMapping();
 
-    // Local editable copy
     const [localFields, setLocalFields] = useState<MappingField[] | null>(null);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState("");
     const [saveSuccess, setSaveSuccess] = useState(false);
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [drawerIndex, setDrawerIndex] = useState<number | null>(null);
+    const [draft, setDraft] = useState<MappingField | null>(null);
     const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
 
-    // Sync remote → local on first load (and on refetch)
+    const effectiveTypes = mappingTypes.length
+        ? mappingTypes
+        : FALLBACK_MAPPING_TYPES;
+    const defaultTypeId = effectiveTypes[0]?.id ?? "";
     const fields = localFields ?? remoteFields;
 
-    function handleChange(index: number, updated: MappingField) {
-        const next = fields.map((f, i) => (i === index ? updated : f));
-        setLocalFields(next);
+    const hasChanges =
+        localFields !== null &&
+        JSON.stringify(localFields) !== JSON.stringify(remoteFields);
+
+    const tableRows = useMemo(
+        () =>
+            fields.map((field, index) => [
+                <button
+                    onClick={() => {
+                        setDrawerIndex(index);
+                        setDraft({ ...field });
+                        setDrawerOpen(true);
+                    }}
+                    className='text-left text-sm text-text hover:underline'
+                >
+                    {field.fieldname || "(sin nombre)"}
+                </button>,
+                <span className='text-xs text-muted'>{field.fieldtypeid}</span>,
+                <span className='text-xs text-muted'>{field.defaultvalue || "—"}</span>,
+                <div className='flex gap-1.5'>
+                    <button
+                        onClick={() => {
+                            setDrawerIndex(index);
+                            setDraft({ ...field });
+                            setDrawerOpen(true);
+                        }}
+                        className='rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30'
+                    >
+                        Editar
+                    </button>
+                    <button
+                        onClick={() => setDeleteIndex(index)}
+                        className='rounded border border-error/50 px-2 py-0.5 text-xs text-error hover:bg-error/10'
+                    >
+                        Eliminar
+                    </button>
+                </div>,
+            ]),
+        [fields],
+    );
+
+    function openCreateDrawer() {
+        setDrawerIndex(null);
+        setDraft(blankField(defaultTypeId));
+        setSaveError("");
+        setDrawerOpen(true);
+    }
+
+    function upsertLocalFields(nextFields: MappingField[]) {
+        setLocalFields(nextFields);
         setSaveSuccess(false);
     }
 
-    function handleAddField() {
-        setLocalFields([...fields, blankField(mappingTypes)]);
-        setSaveSuccess(false);
+    function saveDraft() {
+        if (!draft) return;
+        if (!draft.fieldname.trim()) {
+            setSaveError("Todos los campos deben tener un nombre.");
+            return;
+        }
+
+        if (drawerIndex === null) {
+            upsertLocalFields([...fields, draft]);
+        } else {
+            upsertLocalFields(
+                fields.map((field, index) => (index === drawerIndex ? draft : field)),
+            );
+        }
+        setDrawerOpen(false);
     }
 
-    function handleConfirmDelete() {
+    function confirmDelete() {
         if (deleteIndex === null) return;
-        setLocalFields(fields.filter((_, i) => i !== deleteIndex));
+        upsertLocalFields(fields.filter((_, index) => index !== deleteIndex));
         setDeleteIndex(null);
-        setSaveSuccess(false);
     }
 
-    async function handleSave(e: FormEvent) {
-        e.preventDefault();
-
-        // Validate all fieldname filled
-        const invalid = fields.some((f) => !f.fieldname.trim());
+    async function saveMapping() {
+        const invalid = fields.some((field) => !field.fieldname.trim());
         if (invalid) {
             setSaveError("Todos los campos deben tener un nombre.");
             return;
@@ -127,10 +125,9 @@ export default function MappingsPage() {
         setSaving(true);
         setSaveError("");
         setSaveSuccess(false);
-
         try {
             await setGlobalMapping(fields);
-            setLocalFields(null); // reset to remote
+            setLocalFields(null);
             refetch();
             setSaveSuccess(true);
         } catch (err) {
@@ -140,28 +137,19 @@ export default function MappingsPage() {
         }
     }
 
-    const hasChanges =
-        localFields !== null &&
-        JSON.stringify(localFields) !== JSON.stringify(remoteFields);
-
     return (
         <main className='flex flex-col h-full overflow-hidden'>
-            {/* Top bar */}
             <div className='flex items-center justify-between border-b border-border bg-background px-6 py-4 shrink-0'>
                 <div>
                     <h1 className='text-xl font-semibold text-text-logo'>
                         Mapping global
                     </h1>
                     <p className='text-xs text-muted'>
-                        Define la estructura de campos normalizada para todos
-                        los logs
+                        Gestiona campos y tipos del mapping
                         {typesUsingFallback && (
                             <span className='ml-2 text-muted/60'>
-                                — tipos por defecto (
-                                <code className='font-mono'>
-                                    GET /mappings/types
-                                </code>{" "}
-                                no disponible)
+                                — tipos por defecto (GET /mappings/types no
+                                disponible)
                             </span>
                         )}
                     </p>
@@ -169,15 +157,15 @@ export default function MappingsPage() {
                 <div className='flex gap-2'>
                     <button
                         type='button'
-                        onClick={handleAddField}
+                        onClick={openCreateDrawer}
                         disabled={loading}
                         className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30 disabled:opacity-40'
                     >
-                        + Añadir campo
+                        + Crear nuevo
                     </button>
                     <button
-                        form='mapping-form'
-                        type='submit'
+                        type='button'
+                        onClick={saveMapping}
                         disabled={saving || !hasChanges}
                         className='rounded bg-accent px-4 py-1.5 text-sm font-semibold text-white hover:bg-accent/80 disabled:opacity-40'
                     >
@@ -186,7 +174,6 @@ export default function MappingsPage() {
                 </div>
             </div>
 
-            {/* Body */}
             <div className='flex-1 overflow-y-auto p-6'>
                 {(loadError || saveError) && (
                     <p className='mb-4 rounded bg-error/20 px-3 py-2 text-sm text-error'>
@@ -202,50 +189,97 @@ export default function MappingsPage() {
                 {loading ? (
                     <LoadingState message='Cargando mapping…' />
                 ) : (
-                    <form id='mapping-form' onSubmit={handleSave}>
-                        <div className='rounded-xl border border-border overflow-hidden'>
-                            {fields.length === 0 ? (
-                                <p className='px-4 py-8 text-center text-sm text-muted'>
-                                    Sin campos definidos. Añade el primero con
-                                    "+ Añadir campo".
-                                </p>
-                            ) : (
-                                <table className='w-full text-sm'>
-                                    <thead className='bg-secondary/50'>
-                                        <tr className='text-left'>
-                                            <th className='px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted'>
-                                                Campo
-                                            </th>
-                                            <th className='px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted'>
-                                                Tipo
-                                            </th>
-                                            <th className='px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted'>
-                                                Valor por defecto
-                                            </th>
-                                            <th className='px-3 py-2' />
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {fields.map((field, idx) => (
-                                            <FieldRow
-                                                key={idx}
-                                                field={field}
-                                                mappingTypes={mappingTypes}
-                                                onChange={(updated) =>
-                                                    handleChange(idx, updated)
-                                                }
-                                                onDelete={() =>
-                                                    setDeleteIndex(idx)
-                                                }
-                                            />
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-                    </form>
+                    <DataTable
+                        headers={["Campo", "Tipo", "Valor por defecto", "Acciones"]}
+                        rows={tableRows}
+                        emptyMessage='Sin campos definidos'
+                    />
                 )}
             </div>
+
+            <Drawer
+                open={drawerOpen}
+                title={drawerIndex === null ? "Crear campo" : "Editar campo"}
+                onClose={() => setDrawerOpen(false)}
+                footer={
+                    <div className='flex justify-end gap-3'>
+                        <button
+                            className='rounded border border-border px-4 py-2 text-sm text-muted hover:bg-primary/30'
+                            onClick={() => setDrawerOpen(false)}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            className='rounded bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/80'
+                            onClick={saveDraft}
+                        >
+                            Guardar
+                        </button>
+                    </div>
+                }
+            >
+                {draft && (
+                    <div className='space-y-4'>
+                        <div className='space-y-1'>
+                            <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                                Campo
+                            </label>
+                            <input
+                                className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                                value={draft.fieldname}
+                                onChange={(event) =>
+                                    setDraft((prev) =>
+                                        prev
+                                            ? { ...prev, fieldname: event.target.value }
+                                            : prev,
+                                    )
+                                }
+                                required
+                            />
+                        </div>
+
+                        <div className='space-y-1'>
+                            <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                                Tipo
+                            </label>
+                            <select
+                                className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                                value={draft.fieldtypeid}
+                                onChange={(event) =>
+                                    setDraft((prev) =>
+                                        prev
+                                            ? { ...prev, fieldtypeid: event.target.value }
+                                            : prev,
+                                    )
+                                }
+                            >
+                                {effectiveTypes.map((type) => (
+                                    <option key={type.id} value={type.id}>
+                                        {type.displayname || type.typename || type.id}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className='space-y-1'>
+                            <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                                Valor por defecto
+                            </label>
+                            <input
+                                className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                                value={draft.defaultvalue}
+                                onChange={(event) =>
+                                    setDraft((prev) =>
+                                        prev
+                                            ? { ...prev, defaultvalue: event.target.value }
+                                            : prev,
+                                    )
+                                }
+                            />
+                        </div>
+                    </div>
+                )}
+            </Drawer>
 
             <ConfirmModal
                 open={deleteIndex !== null}
@@ -255,7 +289,7 @@ export default function MappingsPage() {
                         ? `¿Seguro que quieres eliminar el campo "${fields[deleteIndex]?.fieldname || "(sin nombre)"}"?`
                         : ""
                 }
-                onConfirm={handleConfirmDelete}
+                onConfirm={confirmDelete}
                 onCancel={() => setDeleteIndex(null)}
             />
         </main>
