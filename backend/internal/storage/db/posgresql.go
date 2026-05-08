@@ -451,10 +451,6 @@ func (db *PostgreSQLDB) GetProcessorByNameFromDB(name string) (*model.Processor,
 	return &p, nil
 }
 
-func (db *PostgreSQLDB) GetProcessorsByPipelineIDFromDB(pipelineID model.ID) ([]model.PipelineProcessor, error) {
-	return db.GetProcessorsFromPipelineInDB(pipelineID)
-}
-
 func (db *PostgreSQLDB) GetProcessorsByIDFromDB(processorID model.ID) ([]model.Processor, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -508,8 +504,8 @@ func (db *PostgreSQLDB) AddProcessorToPipelineInDB(processor model.PipelineProce
 
 	var id model.ID
 	err := db.pool.QueryRow(ctx,
-		"INSERT INTO PipelineProcessor (ID, pipelineid, processorid, config) VALUES ($1, $2, $3, $4) RETURNING id",
-		processor.ID, processor.PipelineID, processor.ProcessorID, processor.Config).Scan(&id)
+		"INSERT INTO PipelineProcessor (ID, pipelineid, processorid, config, orderinpipeline) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+		processor.ID, processor.PipelineID, processor.ProcessorID, processor.Config, processor.OrderInPipeline).Scan(&id)
 	if err != nil {
 		return model.GenerateErrorUUID(), err
 	}
@@ -520,7 +516,7 @@ func (db *PostgreSQLDB) GetProcessorsFromPipelineInDB(pipelineID model.ID) ([]mo
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	rows, err := db.pool.Query(ctx, `
-		SELECT pipelineprocessor.id, pipelineprocessor.pipelineid, pipelineprocessor.processorid, pipelineprocessor.config, processor.id, processor.name, processor.description, processor.schema, pipeline.id, pipeline.name, pipeline.description
+		SELECT pipelineprocessor.id, pipelineprocessor.pipelineid, pipelineprocessor.processorid, pipelineprocessor.config, pipelineprocessor.orderinpipeline, processor.id, processor.name, processor.description, processor.schema, pipeline.id, pipeline.name, pipeline.description
 		FROM pipelineprocessor
 		JOIN processor ON pipelineprocessor.processorid = processor.id
 		JOIN pipeline ON pipelineprocessor.pipelineid = pipeline.id
@@ -541,6 +537,7 @@ func (db *PostgreSQLDB) GetProcessorsFromPipelineInDB(pipelineID model.ID) ([]mo
 			&p.PipelineID,
 			&p.ProcessorID,
 			&p.Config,
+			&p.OrderInPipeline,
 			&p.Processor.ID,
 			&p.Processor.Name,
 			&p.Processor.Description,
@@ -578,8 +575,8 @@ func (db *PostgreSQLDB) UpdateProcessorInPipelineInDB(processor model.PipelinePr
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := db.pool.Exec(ctx,
-		"UPDATE PipelineProcessor SET processorid = $1, config = $2 WHERE id = $3 AND pipelineid = $4",
-		processor.ProcessorID, processor.Config, processor.ID, processor.PipelineID)
+		"UPDATE PipelineProcessor SET processorid = $1, config = $2, orderinpipeline = $3 WHERE id = $4 AND pipelineid = $5",
+		processor.ProcessorID, processor.Config, processor.OrderInPipeline, processor.ID, processor.PipelineID)
 	return err
 }
 
@@ -589,6 +586,15 @@ func (db *PostgreSQLDB) DeleteProcessorFromPipelineInDB(processorID model.ID) er
 	_, err := db.pool.Exec(ctx,
 		"DELETE FROM PipelineProcessor WHERE id = $1",
 		processorID)
+	return err
+}
+
+func (db *PostgreSQLDB) ClearProcessorsFromPipelineInDB(pipelineID model.ID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM PipelineProcessor WHERE pipelineid = $1",
+		pipelineID)
 	return err
 }
 

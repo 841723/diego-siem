@@ -138,6 +138,7 @@ func (s *Storage) SourceUsesPipeline(sourcePipelineID, updatedPipelineID model.I
 			pipelinesAlreadyChecked[pipelineID] = struct{}{}
 
 			if pipelineID == updatedPipelineID {
+				fmt.Printf("Pipeline %s uses updated pipeline %s\n", sourcePipelineID, updatedPipelineID)
 				return true
 			}
 			subPipelines, err := s.postgres.GetSubPipelinesFromDB(pipelineID)
@@ -171,8 +172,28 @@ func (s *Storage) GetProcessorsFromPipeline(pipelineID model.ID) ([]model.Pipeli
 	return s.postgres.GetProcessorsFromPipelineInDB(pipelineID)
 }
 
-func (s *Storage) UpdateProcessorInPipeline(processor model.PipelineProcessor) error {
-	return s.postgres.UpdateProcessorInPipelineInDB(processor)
+// func (s *Storage) UpdateProcessorInPipeline(processor model.PipelineProcessor) error {
+// 	return s.postgres.UpdateProcessorInPipelineInDB(processor)
+// }
+
+func (s *Storage) UpdateProcessorsInPipeline(pipelineID model.ID, processors []model.PipelineProcessor) error {
+	// Clear existing processors
+	err := s.postgres.ClearProcessorsFromPipelineInDB(pipelineID)
+	if err != nil {
+		return err
+	}
+
+	for index, processor := range processors {
+		processor.PipelineID = pipelineID
+		processor.OrderInPipeline = index
+		_, err := s.AddProcessorToPipeline(processor)
+		if err != nil {
+			fmt.Printf("Failed to add processor %s to pipeline %s: %v\n", processor.ProcessorID, pipelineID, err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *Storage) DeleteProcessorFromPipeline(processorID model.ID) error {
@@ -180,7 +201,7 @@ func (s *Storage) DeleteProcessorFromPipeline(processorID model.ID) error {
 }
 
 func (s *Storage) GetProcessorsByPipelineID(pipelineID model.ID) ([]model.PipelineProcessor, error) {
-	response, err := s.postgres.GetProcessorsByPipelineIDFromDB(pipelineID)
+	response, err := s.postgres.GetProcessorsFromPipelineInDB(pipelineID)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +218,7 @@ func (s *Storage) GetProcessorsByPipelineID(pipelineID model.ID) ([]model.Pipeli
 				if err != nil {
 					return nil, err
 				}
-				subPipelineProcessors, err := s.postgres.GetProcessorsByPipelineIDFromDB(parsedPipelineID)
+				subPipelineProcessors, err := s.postgres.GetProcessorsFromPipelineInDB(parsedPipelineID)
 				if err != nil {
 					return nil, err
 				}

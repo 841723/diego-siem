@@ -1,17 +1,20 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import LoadingState from "../components/LoadingState";
 import { useProcessors } from "../hooks/useProcessors";
 import {
     createPipeline,
-    createPipelineProcessor,
+    deletePipelineProcessor,
     getPipelineFull,
     getPipelineProcessors,
     updatePipeline,
-    deletePipelineProcessor,
     updatePipelineProcessor,
 } from "../services/api";
-import type { Pipeline, PipelineProcessorDraft, ProcessorDefinition } from "../types";
-import LoadingState from "../components/LoadingState";
+import type {
+    Pipeline,
+    PipelineProcessorDraft,
+    ProcessorDefinition,
+} from "../types";
 
 type PipelineFormPrefill = Partial<Pick<Pipeline, "name" | "description">> & {
     fromPipelineId?: string;
@@ -83,7 +86,9 @@ function ProcessorRow({
     const schemaEntries = def ? Object.entries(def.schema) : [];
 
     function handleTypeChange(newType: string) {
-        const nextDef = definitions.find((candidate) => candidate.id === newType);
+        const nextDef = definitions.find(
+            (candidate) => candidate.id === newType,
+        );
         onConfigChange(nextDef ? emptyConfigFor(nextDef) : {});
         onTypeChange(newType);
     }
@@ -93,20 +98,22 @@ function ProcessorRow({
     }
 
     return (
-        <div className="rounded border border-border bg-surface/80 p-3">
-            <div className="flex items-end gap-2">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-xs text-muted">
+        <div className='rounded border border-border bg-surface/80 p-3'>
+            <div className='flex items-end gap-2'>
+                <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-xs text-muted'>
                     {index + 1}
                 </span>
 
-                <div className="flex-1 space-y-1">
-                    <label className="block text-xs text-muted">
+                <div className='flex-1 space-y-1'>
+                    <label className='block text-xs text-muted'>
                         Tipo de procesador
                     </label>
                     <select
-                        className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent"
+                        className='w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent'
                         value={draft.processorId}
-                        onChange={(event) => handleTypeChange(event.target.value)}
+                        onChange={(event) =>
+                            handleTypeChange(event.target.value)
+                        }
                     >
                         {definitions.map((item) => (
                             <option key={item.id} value={item.id}>
@@ -116,31 +123,31 @@ function ProcessorRow({
                     </select>
                 </div>
 
-                <div className="mb-0.5 flex gap-1">
+                <div className='mb-0.5 flex gap-1'>
                     <button
-                        type="button"
+                        type='button'
                         onClick={onMoveUp}
                         disabled={!canMoveUp}
-                        className="rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30 disabled:opacity-40"
-                        title="Mover arriba"
+                        className='rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30 disabled:opacity-40'
+                        title='Mover arriba'
                     >
                         ↑
                     </button>
                     <button
-                        type="button"
+                        type='button'
                         onClick={onMoveDown}
                         disabled={!canMoveDown}
-                        className="rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30 disabled:opacity-40"
-                        title="Mover abajo"
+                        className='rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30 disabled:opacity-40'
+                        title='Mover abajo'
                     >
                         ↓
                     </button>
                     <button
-                        type="button"
+                        type='button'
                         onClick={onRemove}
                         disabled={!canRemove}
-                        className="rounded border border-error/50 px-2 py-0.5 text-xs text-error hover:bg-error/10 disabled:opacity-40"
-                        title="Eliminar procesador"
+                        className='rounded border border-error/50 px-2 py-0.5 text-xs text-error hover:bg-error/10 disabled:opacity-40'
+                        title='Eliminar procesador'
                     >
                         ✕
                     </button>
@@ -148,25 +155,30 @@ function ProcessorRow({
             </div>
 
             {def?.description && (
-                <p className="mt-2 pl-7 text-xs text-muted/80">{def.description}</p>
+                <p className='mt-2 pl-7 text-xs text-muted/80'>
+                    {def.description}
+                </p>
             )}
 
             {schemaEntries.length > 0 && (
-                <div className="mt-3 grid grid-cols-1 gap-2 pl-7 sm:grid-cols-2">
+                <div className='mt-3 grid grid-cols-1 gap-2 pl-7 sm:grid-cols-2'>
                     {schemaEntries.map(([key, schemaType]) => {
                         const currentValue = draft.config[key];
                         if (isBooleanType(schemaType)) {
                             return (
                                 <label
                                     key={key}
-                                    className="flex items-center gap-2 rounded border border-border px-2 py-1 text-xs text-text"
+                                    className='flex items-center gap-2 rounded border border-border px-2 py-1 text-xs text-text'
                                 >
                                     <input
-                                        type="checkbox"
-                                        className="h-4 w-4 accent-accent"
+                                        type='checkbox'
+                                        className='h-4 w-4 accent-accent'
                                         checked={Boolean(currentValue ?? false)}
                                         onChange={(event) =>
-                                            updateField(key, event.target.checked)
+                                            updateField(
+                                                key,
+                                                event.target.checked,
+                                            )
                                         }
                                     />
                                     {key}
@@ -176,13 +188,13 @@ function ProcessorRow({
 
                         if (isArrayType(schemaType)) {
                             return (
-                                <div key={key} className="space-y-0.5">
-                                    <label className="block text-xs text-muted">
+                                <div key={key} className='space-y-0.5'>
+                                    <label className='block text-xs text-muted'>
                                         {key}
                                     </label>
                                     <input
-                                        type="text"
-                                        className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent"
+                                        type='text'
+                                        className='w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent'
                                         value={
                                             Array.isArray(currentValue)
                                                 ? currentValue.join(", ")
@@ -197,18 +209,24 @@ function ProcessorRow({
                                                     .filter(Boolean),
                                             )
                                         }
-                                        placeholder="valor1, valor2"
+                                        placeholder='valor1, valor2'
                                     />
                                 </div>
                             );
                         }
 
                         return (
-                            <div key={key} className="space-y-0.5">
-                                <label className="block text-xs text-muted">{key}</label>
+                            <div key={key} className='space-y-0.5'>
+                                <label className='block text-xs text-muted'>
+                                    {key}
+                                </label>
                                 <input
-                                    type={isNumericType(schemaType) ? "number" : "text"}
-                                    className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent"
+                                    type={
+                                        isNumericType(schemaType)
+                                            ? "number"
+                                            : "text"
+                                    }
+                                    className='w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent'
                                     value={
                                         isNumericType(schemaType)
                                             ? String(currentValue ?? 0)
@@ -239,13 +257,18 @@ export default function PipelineFormPage() {
     const isEdit = Boolean(id);
     const prefill = (location.state as PipelineFormPrefill | null) ?? null;
 
-    const { processors: processorDefs, loading: defsLoading, error: defsError } =
-        useProcessors();
+    const {
+        processors: processorDefs,
+        loading: defsLoading,
+        error: defsError,
+    } = useProcessors();
 
     const [name, setName] = useState(prefill?.name ?? "");
     const [description, setDescription] = useState(prefill?.description ?? "");
     const [drafts, setDrafts] = useState<PipelineProcessorDraft[]>([]);
-    const [loadingItem, setLoadingItem] = useState(isEdit || Boolean(prefill?.fromPipelineId));
+    const [loadingItem, setLoadingItem] = useState(
+        isEdit || Boolean(prefill?.fromPipelineId),
+    );
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
 
@@ -320,7 +343,8 @@ export default function PipelineFormPage() {
     }, [isEdit, prefill?.fromPipelineId]);
 
     useEffect(() => {
-        if (defsLoading || loadingItem || drafts.length > 0 || !defaultDraft) return;
+        if (defsLoading || loadingItem || drafts.length > 0 || !defaultDraft)
+            return;
         setDrafts([defaultDraft]);
     }, [defaultDraft, defsLoading, drafts.length, loadingItem]);
 
@@ -371,23 +395,24 @@ export default function PipelineFormPage() {
         const existing = await getPipelineProcessors(pipelineId);
         const sharedCount = Math.min(existing.length, drafts.length);
 
-        for (let index = 0; index < sharedCount; index += 1) {
-            const target = existing[index];
-            const draft = drafts[index];
-            await updatePipelineProcessor(pipelineId, target.id, {
+        // send a single put request with the full list of processors, including their IDs, to update them all at once
+        await updatePipelineProcessor(
+            pipelineId,
+            drafts.map((draft, index) => ({
+                id: existing[index]?.id ?? crypto.randomUUID(),
                 processorid: draft.processorId,
                 config: draft.config,
-            });
-        }
+            })),
+        );
 
-        for (let index = sharedCount; index < drafts.length; index += 1) {
-            const draft = drafts[index];
-            await createPipelineProcessor(pipelineId, {
-                id: crypto.randomUUID(),
-                processorid: draft.processorId,
-                config: draft.config,
-            });
-        }
+        // for (let index = sharedCount; index < drafts.length; index += 1) {
+        //     const draft = drafts[index];
+        //     await createPipelineProcessor(pipelineId, {
+        //         id: crypto.randomUUID(),
+        //         processorid: draft.processorId,
+        //         config: draft.config,
+        //     });
+        // }
 
         for (let index = sharedCount; index < existing.length; index += 1) {
             await deletePipelineProcessor(pipelineId, existing[index].id);
@@ -415,19 +440,19 @@ export default function PipelineFormPage() {
         }
     }
 
-    if (loadingItem) return <LoadingState message="Cargando pipeline…" />;
+    if (loadingItem) return <LoadingState message='Cargando pipeline…' />;
 
     return (
-        <main className="flex h-full flex-col overflow-hidden">
-            <div className="shrink-0 border-b border-border bg-background px-6 py-4">
-                <div className="flex items-center gap-4">
+        <main className='flex h-full flex-col overflow-hidden'>
+            <div className='shrink-0 border-b border-border bg-background px-6 py-4'>
+                <div className='flex items-center gap-4'>
                     <button
                         onClick={() => navigate("/pipelines")}
-                        className="rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30"
+                        className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
                     >
                         ← Volver
                     </button>
-                    <h1 className="text-xl font-semibold text-text-logo">
+                    <h1 className='text-xl font-semibold text-text-logo'>
                         {isEdit
                             ? "Editar pipeline"
                             : prefill
@@ -437,64 +462,69 @@ export default function PipelineFormPage() {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
-                <div className="mx-auto max-w-3xl">
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        <div className="space-y-1">
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
+            <div className='flex-1 overflow-y-auto p-6'>
+                <div className='mx-auto max-w-3xl'>
+                    <form onSubmit={handleSubmit} className='space-y-5'>
+                        <div className='space-y-1'>
+                            <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
                                 Nombre
                             </label>
                             <input
-                                className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent"
+                                className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
                                 value={name}
-                                onChange={(event) => setName(event.target.value)}
-                                placeholder="ej. syslog-normalize"
+                                onChange={(event) =>
+                                    setName(event.target.value)
+                                }
+                                placeholder='ej. syslog-normalize'
                                 required
                             />
                         </div>
 
-                        <div className="space-y-1">
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
+                        <div className='space-y-1'>
+                            <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
                                 Descripción
                             </label>
                             <textarea
-                                className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent"
+                                className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
                                 rows={2}
                                 value={description}
                                 onChange={(event) =>
                                     setDescription(event.target.value)
                                 }
-                                placeholder="Describe qué hace este pipeline…"
+                                placeholder='Describe qué hace este pipeline…'
                             />
                         </div>
 
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span className="block text-xs font-semibold uppercase tracking-wider text-muted">
+                        <div className='space-y-2'>
+                            <div className='flex items-center justify-between'>
+                                <span className='block text-xs font-semibold uppercase tracking-wider text-muted'>
                                     Procesadores (flujo)
                                 </span>
                                 <button
-                                    type="button"
+                                    type='button'
                                     onClick={addProcessor}
-                                    disabled={defsLoading || processorDefs.length === 0}
-                                    className="rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30 disabled:opacity-40"
+                                    disabled={
+                                        defsLoading ||
+                                        processorDefs.length === 0
+                                    }
+                                    className='rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30 disabled:opacity-40'
                                 >
                                     + Añadir procesador
                                 </button>
                             </div>
 
                             {(defsError || error) && (
-                                <p className="rounded bg-error/20 px-3 py-2 text-sm text-error">
+                                <p className='rounded bg-error/20 px-3 py-2 text-sm text-error'>
                                     {defsError || error}
                                 </p>
                             )}
 
                             {defsLoading ? (
-                                <p className="text-xs text-muted">
+                                <p className='text-xs text-muted'>
                                     Cargando tipos de procesadores…
                                 </p>
                             ) : (
-                                <div className="space-y-2">
+                                <div className='space-y-2'>
                                     {drafts.map((draft, index) => (
                                         <div key={draft.clientId}>
                                             <ProcessorRow
@@ -503,7 +533,9 @@ export default function PipelineFormPage() {
                                                 definitions={processorDefs}
                                                 canRemove={drafts.length > 1}
                                                 canMoveUp={index > 0}
-                                                canMoveDown={index < drafts.length - 1}
+                                                canMoveDown={
+                                                    index < drafts.length - 1
+                                                }
                                                 onTypeChange={(value) =>
                                                     updateType(index, value)
                                                 }
@@ -516,10 +548,12 @@ export default function PipelineFormPage() {
                                                 onMoveDown={() =>
                                                     moveProcessor(index, 1)
                                                 }
-                                                onRemove={() => removeProcessor(index)}
+                                                onRemove={() =>
+                                                    removeProcessor(index)
+                                                }
                                             />
                                             {index < drafts.length - 1 && (
-                                                <div className="px-2 py-1 text-center text-xs text-muted/70">
+                                                <div className='px-2 py-1 text-center text-xs text-muted/70'>
                                                     ↓
                                                 </div>
                                             )}
@@ -529,16 +563,16 @@ export default function PipelineFormPage() {
                             )}
                         </div>
 
-                        <div className="flex gap-3 pt-2">
+                        <div className='flex gap-3 pt-2'>
                             <button
-                                type="submit"
+                                type='submit'
                                 disabled={
                                     submitting ||
                                     defsLoading ||
                                     processorDefs.length === 0 ||
                                     drafts.length === 0
                                 }
-                                className="rounded bg-accent px-5 py-2 text-sm font-semibold text-white hover:bg-accent/80 disabled:opacity-50"
+                                className='rounded bg-accent px-5 py-2 text-sm font-semibold text-white hover:bg-accent/80 disabled:opacity-50'
                             >
                                 {submitting
                                     ? "Guardando…"
@@ -547,9 +581,9 @@ export default function PipelineFormPage() {
                                       : "Crear pipeline"}
                             </button>
                             <button
-                                type="button"
+                                type='button'
                                 onClick={() => navigate("/pipelines")}
-                                className="rounded border border-border px-5 py-2 text-sm text-muted hover:bg-primary/30"
+                                className='rounded border border-border px-5 py-2 text-sm text-muted hover:bg-primary/30'
                             >
                                 Cancelar
                             </button>

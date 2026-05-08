@@ -41,12 +41,13 @@ type Processor struct {
 type PipelineProcessorConfig = json.RawMessage
 
 type PipelineProcessor struct {
-	ID          ID                      `json:"id"`
-	PipelineID  ID                      `json:"pipelineid"`
-	ProcessorID ID                      `json:"processorid"`
-	Config      PipelineProcessorConfig `json:"config"` // JSON configuration specific to this processor in the pipeline
-	Pipeline    Pipeline
-	Processor   Processor
+	ID              ID                      `json:"id"`
+	PipelineID      ID                      `json:"pipelineid"`
+	ProcessorID     ID                      `json:"processorid"`
+	Config          PipelineProcessorConfig `json:"config"` // JSON configuration specific to this processor in the pipeline
+	OrderInPipeline int                     `json:"order"`  // Order of execution in the pipeline
+	Pipeline        Pipeline
+	Processor       Processor
 }
 
 type MappingType struct {

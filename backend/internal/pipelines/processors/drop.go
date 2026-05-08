@@ -8,14 +8,10 @@ import (
 
 /*
 	{
-		"field": "string",
-		"value": "string"
 	}
 */
 type Drop struct {
-	Processor
-	Field string `json:"field"`
-	Value string `json:"value"`
+	ProcessorMeta
 }
 
 func (p *Drop) Process(logData model.LogData) error {
@@ -30,5 +26,12 @@ func NewDropProcessor(config model.PipelineProcessorConfig) (*Drop, error) {
 		return nil, err
 	}
 
+	DropConfig.ProcessorMeta = WithMeta("Drop", "Drops the log entry if a field matches a certain value", "{}")
 	return &DropConfig, nil
+}
+
+func init() {
+	Register("Drop", func(config model.PipelineProcessorConfig) (Processor, error) {
+		return NewDropProcessor(config)
+	})
 }

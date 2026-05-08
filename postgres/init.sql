@@ -29,7 +29,8 @@ CREATE TABLE PipelineProcessor (
     ID UUID PRIMARY KEY,
     PipelineID UUID NOT NULL,
     ProcessorID UUID NOT NULL,
-    Config JSONB,
+    Config JSONB NOT NULL,
+    OrderInPipeline INT NOT NULL,
     FOREIGN KEY (PipelineID) REFERENCES Pipeline(ID),
     FOREIGN KEY (ProcessorID) REFERENCES Processor(ID)
 );
@@ -107,7 +108,7 @@ INSERT INTO Protocol (Name) VALUES ('tcp'), ('udp');
 
     INSERT INTO Processor (ID, Name, Description, Schema) VALUES 
     ('9f0a1b2c-3d4e-5f6a-7b8c-9d0e1f2a3b4c', 'Drop', 'Drops the log entry if a field matches a certain value', 
-    '{"field": "string", "value": "string"}');
+    '{}');
 
 -- pipelines
     INSERT INTO Pipeline (ID, Name, Description) VALUES 

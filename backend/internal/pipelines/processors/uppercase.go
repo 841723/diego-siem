@@ -11,7 +11,8 @@ import (
 {"field": "string"}
 */
 type Uppercase struct {
-	Processor
+	ProcessorMeta
+
 	Field string `json:"field"`
 }
 
@@ -21,11 +22,18 @@ func (p *Uppercase) Process(logData model.LogData) error {
 }
 
 func NewUppercaseProcessor(config model.PipelineProcessorConfig) (*Uppercase, error) {
-	var UppercaseConfig Uppercase
-	err := json.Unmarshal(config, &UppercaseConfig)
+	var cfg Uppercase
+	err := json.Unmarshal(config, &cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return &UppercaseConfig, nil
+	cfg.ProcessorMeta = WithMeta("Uppercase", "Convierte el valor de un campo a mayúsculas", "{\"field\": \"string\"}")
+	return &cfg, nil
+}
+
+func init() {
+	Register("Uppercase", func(config model.PipelineProcessorConfig) (Processor, error) {
+		return NewUppercaseProcessor(config)
+	})
 }

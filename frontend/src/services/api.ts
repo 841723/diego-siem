@@ -77,6 +77,7 @@ function normalizePipelineProcessor(raw: unknown): PipelineProcessor {
                       ),
                   }
                 : undefined,
+        order: typeof item.order === "number" ? item.order : 0,
     };
 }
 
@@ -215,29 +216,28 @@ export async function getPipelineProcessors(
     return Array.isArray(payload) ? payload.map(normalizePipelineProcessor) : [];
 }
 
-export async function createPipelineProcessor(
-    pipelineId: string,
-    processor: Pick<PipelineProcessor, "id" | "processorid" | "config">,
-): Promise<PipelineProcessor> {
-    const payload = await request<unknown>(`/pipelines/${pipelineId}/processors`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(processor),
-    });
-    return normalizePipelineProcessor(payload);
-}
+// export async function createPipelineProcessor(
+//     pipelineId: string,
+//     processor: Pick<PipelineProcessor, "id" | "processorid" | "config">,
+// ): Promise<PipelineProcessor> {
+//     const payload = await request<unknown>(`/pipelines/${pipelineId}/processors`, {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify(processor),
+//     });
+//     return normalizePipelineProcessor(payload);
+// }
 
 export async function updatePipelineProcessor(
     pipelineId: string,
-    processorId: string,
-    processor: Pick<PipelineProcessor, "processorid" | "config">,
+    processors: Array<Pick<PipelineProcessor, "id" | "processorid" | "config">>,
 ): Promise<PipelineProcessor> {
     const payload = await request<unknown>(
-        `/pipelines/${pipelineId}/processors/${processorId}`,
+        `/pipelines/${pipelineId}/processors`,
         {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(processor),
+            body: JSON.stringify(processors),
         },
     );
     return normalizePipelineProcessor(payload);

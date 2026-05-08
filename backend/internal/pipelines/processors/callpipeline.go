@@ -12,7 +12,8 @@ import (
 	}
 */
 type CallPipeline struct {
-	Processor
+	ProcessorMeta
+
 	PipelineID string `json:"pipeline_id"`
 }
 
@@ -22,11 +23,18 @@ func (p *CallPipeline) Process(logData model.LogData) error {
 }
 
 func NewCallPipelineProcessor(config model.PipelineProcessorConfig) (*CallPipeline, error) {
-	var CallPipelineConfig CallPipeline
-	err := json.Unmarshal(config, &CallPipelineConfig)
+	var cfg CallPipeline
+	err := json.Unmarshal(config, &cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return &CallPipelineConfig, nil
+	cfg.ProcessorMeta = WithMeta("Call Pipeline", "Calls another pipeline and processes the results", "{\"pipeline_id\": \"uuid\"}")
+	return &cfg, nil
+}
+
+func init() {
+	Register("Call Pipeline", func(config model.PipelineProcessorConfig) (Processor, error) {
+		return NewCallPipelineProcessor(config)
+	})
 }

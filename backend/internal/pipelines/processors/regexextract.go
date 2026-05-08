@@ -11,7 +11,8 @@ import (
 {"field": "string", "regex": "string", "destination_field": "string"}
 */
 type RegexExtract struct {
-	Processor
+	ProcessorMeta
+
 	Field            string `json:"field"`
 	Regex            string `json:"regex"`
 	DestinationField string `json:"destination_field"`
@@ -34,11 +35,18 @@ func (p *RegexExtract) Process(logData model.LogData) error {
 }
 
 func NewRegexExtractProcessor(config model.PipelineProcessorConfig) (*RegexExtract, error) {
-	var RegexExtractConfig RegexExtract
-	err := json.Unmarshal(config, &RegexExtractConfig)
+	var cfg RegexExtract
+	err := json.Unmarshal(config, &cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return &RegexExtractConfig, nil
+	cfg.ProcessorMeta = WithMeta("Regex Extract", "Extrae un valor de un campo usando una expresión regular", "{\"field\": \"string\", \"regex\": \"string\", \"destination_field\": \"string\"}")
+	return &cfg, nil
+}
+
+func init() {
+	Register("Regex Extract", func(config model.PipelineProcessorConfig) (Processor, error) {
+		return NewRegexExtractProcessor(config)
+	})
 }

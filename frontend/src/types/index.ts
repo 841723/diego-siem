@@ -61,6 +61,7 @@ export type PipelineProcessor = {
     pipelineid: string;
     processorid: string;
     config: Record<string, unknown>;
+    order: number;
     processor?: ProcessorDefinition;
     pipeline?: Pipeline;
 };

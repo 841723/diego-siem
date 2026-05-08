@@ -14,7 +14,8 @@ import (
 */
 
 type Rename struct {
-	Processor
+	ProcessorMeta
+
 	DestinationField string `json:"destination_field"`
 	SourceField      string `json:"source_field"`
 }
@@ -26,11 +27,19 @@ func (p *Rename) Process(logData model.LogData) error {
 }
 
 func NewRenameProcessor(config model.PipelineProcessorConfig) (*Rename, error) {
-	var RenameConfig Rename
-	err := json.Unmarshal(config, &RenameConfig)
+	var cfg Rename
+	err := json.Unmarshal(config, &cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return &RenameConfig, nil
+	cfg.ProcessorMeta = WithMeta("Rename", "Renombra un campo a otro nombre", "{\"source_field\": \"string\", \"destination_field\": \"string\"}")
+	 
+	return &cfg, nil
+}
+
+func init() {
+	Register("Rename", func(config model.PipelineProcessorConfig) (Processor, error) {
+		return NewRenameProcessor(config)
+	})
 }

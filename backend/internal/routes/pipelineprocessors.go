@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"backend/internal/model"
+	"backend/internal/service"
 	"backend/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -11,10 +12,11 @@ import (
 
 type PipelineProcessorsHandler struct {
 	storage *storage.Storage
+	sources *service.SourceManager
 }
 
-func NewPipelineProcessorsHandler(storage *storage.Storage) *PipelineProcessorsHandler {
-	return &PipelineProcessorsHandler{storage: storage}
+func NewPipelineProcessorsHandler(storage *storage.Storage, sources *service.SourceManager) *PipelineProcessorsHandler {
+	return &PipelineProcessorsHandler{storage: storage, sources: sources}
 }
 
 func (h *PipelineProcessorsHandler) ProcessorMiddleware(c *gin.Context) {
@@ -42,28 +44,28 @@ func (h *PipelineProcessorsHandler) ProcessorMiddleware(c *gin.Context) {
 	c.Next()
 }
 
-func (h *PipelineProcessorsHandler) AddProcessorToPipeline(c *gin.Context) {
-	var processor model.PipelineProcessor
-	if err := c.BindJSON(&processor); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+// func (h *PipelineProcessorsHandler) AddProcessorToPipeline(c *gin.Context) {
+// 	var processor model.PipelineProcessor
+// 	if err := c.BindJSON(&processor); err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 		return
+// 	}
 
-	pipelineId, exists := c.Get("pipelineId")
-	if !exists {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve pipeline ID"})
-		return
-	}
-	processor.PipelineID = pipelineId.(model.ID)
+// 	pipelineId, exists := c.Get("pipelineId")
+// 	if !exists {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve pipeline ID"})
+// 		return
+// 	}
+// 	processor.PipelineID = pipelineId.(model.ID)
 
-	_, err := h.storage.AddProcessorToPipeline(processor)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+// 	_, err := h.storage.AddProcessorToPipeline(processor)
+// 	if err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+// 		return
+// 	}
 
-	c.JSON(http.StatusCreated, processor)
-}
+// 	c.JSON(http.StatusCreated, processor)
+// }
 
 func (h *PipelineProcessorsHandler) GetProcessorsFromPipeline(c *gin.Context) {
 	strId := c.Param("id")
@@ -81,9 +83,42 @@ func (h *PipelineProcessorsHandler) GetProcessorsFromPipeline(c *gin.Context) {
 	c.JSON(200, processors)
 }
 
-func (h *PipelineProcessorsHandler) UpdateProcessorInPipeline(c *gin.Context) {
-	var processor model.PipelineProcessor
-	if err := c.BindJSON(&processor); err != nil {
+// func (h *PipelineProcessorsHandler) UpdateProcessorInPipeline(c *gin.Context) {
+// 	var processor model.PipelineProcessor
+// 	if err := c.BindJSON(&processor); err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 		return
+// 	}
+
+// 	pipelineId, exists := c.Get("pipelineId")
+// 	if !exists {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve pipeline ID"})
+// 		return
+// 	}
+// 	processor.PipelineID = pipelineId.(model.ID)
+
+// 	strProcessorId := c.Param("processor_id")
+// 	processorId, err := model.ParseAndCheckUUID(strProcessorId)
+// 	if err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid processor ID"})
+// 		return
+// 	}
+
+// 	processor.ID = processorId
+// 	processor.PipelineID = pipelineId.(model.ID)
+
+// 	err = h.storage.UpdateProcessorInPipeline(processor)
+// 	if err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+// 		return
+// 	}
+
+// 	c.JSON(200, processor)
+// }
+
+func (h *PipelineProcessorsHandler) UpdateProcessorsInPipeline(c *gin.Context) {
+	var processors []model.PipelineProcessor
+	if err := c.BindJSON(&processors); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -93,25 +128,21 @@ func (h *PipelineProcessorsHandler) UpdateProcessorInPipeline(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve pipeline ID"})
 		return
 	}
-	processor.PipelineID = pipelineId.(model.ID)
 
-	strProcessorId := c.Param("processor_id")
-	processorId, err := model.ParseAndCheckUUID(strProcessorId)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid processor ID"})
-		return
-	}
-
-	processor.ID = processorId
-	processor.PipelineID = pipelineId.(model.ID)
-
-	err = h.storage.UpdateProcessorInPipeline(processor)
+	pipelineID := pipelineId.(model.ID)
+	err := h.storage.UpdateProcessorsInPipeline(pipelineID, processors)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(200, processor)
+	err = h.sources.UpdatePipelineInSourceConfig(pipelineID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, processors)
 }
 
 func (h *PipelineProcessorsHandler) DeleteProcessorFromPipeline(c *gin.Context) {
@@ -121,13 +152,12 @@ func (h *PipelineProcessorsHandler) DeleteProcessorFromPipeline(c *gin.Context) 
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid processor ID"})
 		return
 	}
-	
+
 	_, exists := c.Get("pipelineId")
 	if !exists {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve pipeline ID"})
 		return
 	}
-	
 
 	err = h.storage.DeleteProcessorFromPipeline(processorId)
 	if err != nil {
@@ -138,12 +168,13 @@ func (h *PipelineProcessorsHandler) DeleteProcessorFromPipeline(c *gin.Context) 
 	c.JSON(200, gin.H{"message": "Processor deleted successfully"})
 }
 
-func PipelineProcessorsRegisterRoutes(r *gin.Engine, processorsGroup *gin.RouterGroup, storage *storage.Storage) {
-	handler := NewPipelineProcessorsHandler(storage)
+func PipelineProcessorsRegisterRoutes(r *gin.Engine, processorsGroup *gin.RouterGroup, sources *service.SourceManager, storage *storage.Storage) {
+	handler := NewPipelineProcessorsHandler(storage, sources)
 	processorsGroup.Use(handler.ProcessorMiddleware)
 
-	processorsGroup.POST("", handler.AddProcessorToPipeline)
+	// processorsGroup.POST("", handler.AddProcessorToPipeline)
 	processorsGroup.GET("", handler.GetProcessorsFromPipeline)
-	processorsGroup.PUT("/:processor_id", handler.UpdateProcessorInPipeline)
+	processorsGroup.PUT("", handler.UpdateProcessorsInPipeline)
+
 	processorsGroup.DELETE("/:processor_id", handler.DeleteProcessorFromPipeline)
 }

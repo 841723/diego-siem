@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"backend/internal/model"
@@ -132,6 +133,7 @@ func (s *SourceManager) UpdateSource(cfg model.SourceConfig) (*model.SourceConfi
 
 	existingSource, err := s.storage.GetSourceByID(cfg.ID)
 	if err != nil || existingSource == nil {
+		fmt.Printf("Source with ID %s does not exist\n", cfg.ID)
 		return nil, errors.New("source with given ID does not exist")
 	}
 
@@ -143,6 +145,7 @@ func (s *SourceManager) UpdateSource(cfg model.SourceConfig) (*model.SourceConfi
 	cfgInDB, err := s.storage.GetSourceByPortAndProtocol(cfg.Port, cfg.Protocol)
 	if err != nil || cfgInDB.ID != cfg.ID {
 		// source with same port and protocol already exists, do not add to DB
+		fmt.Printf("Source with port %d and protocol %s already exists with ID %s\n", cfg.Port, cfg.Protocol, cfgInDB.ID)
 		return nil, errors.New("source with same port and protocol already exists")
 	}
 
@@ -151,20 +154,37 @@ func (s *SourceManager) UpdateSource(cfg model.SourceConfig) (*model.SourceConfi
 		return nil, errors.New("error updating source in DB")
 	}
 
+	err = s.UpdatePipelineInSourceConfig(cfg.PipelineID)
+	if err != nil {
+		return nil, errors.New("error updating pipeline in source config")
+	}
+
 	id := s.NewSourceConfigRuntime(cfg)
 	s.StartSource(id)
 
 	return &cfg, nil
 }
 
+func printPipelineProcessors(processors []model.PipelineProcessor) {
+	fmt.Printf("Pipeline Processors:\n")
+	for _, p := range processors {
+		fmt.Printf("- Processor ID: %s, Pipeline ID: %s, Order: %d\n", p.ProcessorID, p.PipelineID, p.OrderInPipeline)
+	}
+}
+
 func (s *SourceManager) UpdatePipelineInSourceConfig(updatedPipelineID model.ID) error {
 	for _, sourceRuntime := range s.sources {
+		fmt.Printf("Checking if source with pipeline ID %s uses updated pipeline ID %s\n", sourceRuntime.Config.PipelineID, updatedPipelineID)
 		if s.storage.SourceUsesPipeline(sourceRuntime.Config.PipelineID, updatedPipelineID) {
+			fmt.Printf("Source with pipeline ID %s uses updated pipeline ID %s, updating its pipeline processors\n", sourceRuntime.Config.PipelineID, updatedPipelineID)
 			newPipeline, err := s.storage.GetProcessorsByPipelineID(sourceRuntime.Config.PipelineID)
+			printPipelineProcessors(newPipeline)
 			if err != nil {
 				return err
 			}
 			sourceRuntime.PipelineProcessors = newPipeline
+		} else {
+			fmt.Printf("Source with pipeline ID %s does not use updated pipeline ID %s\n", sourceRuntime.Config.PipelineID, updatedPipelineID)
 		}
 	}
 	return nil

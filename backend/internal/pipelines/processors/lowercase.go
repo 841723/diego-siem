@@ -11,7 +11,8 @@ import (
 {"field": "string"}
 */
 type Lowercase struct {
-	Processor
+	ProcessorMeta
+
 	Field string `json:"field"`
 }
 
@@ -21,11 +22,18 @@ func (p *Lowercase) Process(logData model.LogData) error {
 }
 
 func NewLowercaseProcessor(config model.PipelineProcessorConfig) (*Lowercase, error) {
-	var LowercaseConfig Lowercase
-	err := json.Unmarshal(config, &LowercaseConfig)
+	var cfg Lowercase
+	err := json.Unmarshal(config, &cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return &LowercaseConfig, nil
+	cfg.ProcessorMeta = WithMeta("Lowercase", "Convierte el valor de un campo a minúsculas", "{\"field\": \"string\"}")
+	return &cfg, nil
+}
+
+func init() {
+	Register("Lowercase", func(config model.PipelineProcessorConfig) (Processor, error) {
+		return NewLowercaseProcessor(config)
+	})
 }

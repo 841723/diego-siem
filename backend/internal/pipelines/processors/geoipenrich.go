@@ -10,7 +10,8 @@ import (
 {"ip_field": "string", "destination_field": "string"}
 */
 type GeoIpEnrich struct {
-	Processor
+	ProcessorMeta
+
 	IpField          string `json:"ip_field"`
 	DestinationField string `json:"destination_field"`
 }
@@ -27,5 +28,12 @@ func NewGeoIpEnrichProcessor(config model.PipelineProcessorConfig) (*GeoIpEnrich
 		return nil, err
 	}
 
+	GeoIpEnrichConfig.ProcessorMeta = WithMeta("GeoIP Enrich", "Enriquece los datos de una dirección IP con información geográfica", "{\"ip_field\": \"string\", \"destination_field\": \"string\"}")
 	return &GeoIpEnrichConfig, nil
+}
+
+func init() {
+	Register("GeoIP Enrich", func(config model.PipelineProcessorConfig) (Processor, error) {
+		return NewGeoIpEnrichProcessor(config)
+	})
 }

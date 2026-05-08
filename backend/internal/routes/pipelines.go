@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"backend/internal/model"
+	"backend/internal/service"
 	"backend/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -11,10 +12,11 @@ import (
 
 type PipelinesHandler struct {
 	storage *storage.Storage
+	sources *service.SourceManager
 }
 
-func NewPipelinesHandler(storage *storage.Storage) *PipelinesHandler {
-	return &PipelinesHandler{storage: storage}
+func NewPipelinesHandler(storage *storage.Storage, sources *service.SourceManager) *PipelinesHandler {
+	return &PipelinesHandler{storage: storage, sources: sources}
 }
 
 func (h *PipelinesHandler) AddPipeline(c *gin.Context) {
@@ -142,8 +144,8 @@ func (h *PipelinesHandler) ClearPipelineByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Pipeline cleared successfully"})
 }
 
-func PipelinesRegisterRoutes(r *gin.Engine, storage *storage.Storage) {
-	handler := NewPipelinesHandler(storage)
+func PipelinesRegisterRoutes(r *gin.Engine, sources *service.SourceManager, storage *storage.Storage) {
+	handler := NewPipelinesHandler(storage, sources)
 	pipelinesGroup := r.Group("/pipelines")
 
 	pipelinesGroup.POST("", handler.AddPipeline)
@@ -155,5 +157,5 @@ func PipelinesRegisterRoutes(r *gin.Engine, storage *storage.Storage) {
 	pipelinesGroup.DELETE("/:id", handler.ClearPipelineByID)
 
 	processorsGroup := pipelinesGroup.Group("/:id/processors")
-	PipelineProcessorsRegisterRoutes(r, processorsGroup, storage)
+	PipelineProcessorsRegisterRoutes(r, processorsGroup, sources, storage)
 }

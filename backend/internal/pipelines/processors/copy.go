@@ -7,10 +7,14 @@ import (
 )
 
 /*
-{"source_field": "string", "destination_field": "string"
+	{
+		"source_field": "string",
+		"destination_field": "string"
+	}
 */
 type Copy struct {
-	Processor
+	ProcessorMeta
+
 	SourceField      string `json:"source_field"`
 	DestinationField string `json:"destination_field"`
 }
@@ -27,11 +31,18 @@ func (p *Copy) Process(logData model.LogData) error {
 }
 
 func NewCopyProcessor(config model.PipelineProcessorConfig) (*Copy, error) {
-	var CopyConfig Copy
-	err := json.Unmarshal(config, &CopyConfig)
+	var cfg Copy
+	err := json.Unmarshal(config, &cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return &CopyConfig, nil
+	cfg.ProcessorMeta = WithMeta("Copy", "Copies a field from one location to another in the log data", "{\"source_field\": \"string\", \"destination_field\": \"string\"}")
+	return &cfg, nil
+}
+
+func init() {
+	Register("Copy", func(config model.PipelineProcessorConfig) (Processor, error) {
+		return NewCopyProcessor(config)
+	})
 }

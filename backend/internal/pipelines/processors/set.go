@@ -7,13 +7,14 @@ import (
 )
 
 /*
-{
-	"destination_field": "string", 
-	"value": "string"
-}
+	{
+		"destination_field": "string",
+		"value": "string"
+	}
 */
 type Set struct {
-	Processor
+	ProcessorMeta
+
 	DestinationField string `json:"destination_field"`
 	Value            string `json:"value"`
 }
@@ -24,11 +25,18 @@ func (p *Set) Process(logData model.LogData) error {
 }
 
 func NewSetProcessor(config model.PipelineProcessorConfig) (*Set, error) {
-	var SetConfig Set
-	err := json.Unmarshal(config, &SetConfig)
+	var cfg Set
+	err := json.Unmarshal(config, &cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SetConfig, nil
+	cfg.ProcessorMeta = WithMeta("Set", "Asigna un valor fijo a un campo", "{\"destination_field\": \"string\", \"value\": \"string\"}")
+	return &cfg, nil
+}
+
+func init() {
+	Register("Set", func(config model.PipelineProcessorConfig) (Processor, error) {
+		return NewSetProcessor(config)
+	})
 }

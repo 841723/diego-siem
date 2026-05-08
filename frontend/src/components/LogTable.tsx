@@ -55,13 +55,19 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
                                     {getCellValue(loading, log, col)}
                                 </span>
                                 {!loading && (
-                                    <div 
-                                        className='absolute -top-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 bg-primary px-1 py-0.5 z-10'
+                                    <div
+                                        // haz que tarde 500ms en aparecer para evitar que aparezca al hacer hover rápido entre celdas
+                                        className='absolute -top-0.5 opacity-0 group-hover:opacity-100 flex gap-0.5 bg-primary px-1 py-0.5 z-10'
                                         style={{
                                             right: idx === 0 ? "-60px" : "",
                                             left: idx === 0 ? "" : "-60px",
-                                            borderRadius: idx === 0 ?  "0 0.25rem 0.25rem 0" : "0.25rem 0 0 0.25rem",
-                                        }}    
+                                            borderRadius:
+                                                idx === 0
+                                                    ? "0 0.25rem 0.25rem 0"
+                                                    : "0.25rem 0 0 0.25rem",
+                                            transition:
+                                                "opacity 0.5s step-end 0s",
+                                        }}
                                     >
                                         <button
                                             className='bg-muted font-extrabold text-accent text-xs rounded-full h-4 w-4 flex items-center justify-center border hover:bg-accent/80 hover:text-primary transition-colors'
@@ -126,17 +132,17 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
                                             }}
                                         >
                                             <svg
-                                                width="14"
-                                                height="14"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="1.5"
-                                                >
-                                                <path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" />
-                                                <path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z" />
-                                                <path d="M9 12h6" />
-                                                <path d="M9 16h6" />
+                                                width='14'
+                                                height='14'
+                                                viewBox='0 0 24 24'
+                                                fill='none'
+                                                stroke='currentColor'
+                                                strokeWidth='1.5'
+                                            >
+                                                <path d='M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2' />
+                                                <path d='M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z' />
+                                                <path d='M9 12h6' />
+                                                <path d='M9 16h6' />
                                             </svg>
                                         </button>
                                     </div>
