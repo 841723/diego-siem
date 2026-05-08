@@ -32,10 +32,13 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function normalizeProcessorDefinition(raw: unknown): ProcessorDefinition {
     const item = asRecord(raw);
+    const humanDescription =
+        item.humandescription ?? item.humanDescription ?? item.description ?? "";
     return {
         id: String(item.id ?? ""),
         name: String(item.name ?? ""),
         description: String(item.description ?? ""),
+        humandescription: String(humanDescription),
         schema: asRecord(item.schema ?? item.config),
     };
 }

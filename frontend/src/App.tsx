@@ -29,6 +29,8 @@ export default function App() {
 
                 {/* Global Mapping */}
                 <Route path="/mapping" element={<MappingsPage />} />
+                <Route path="/mapping/new" element={<MappingFormPage />} />
+                <Route path="/mapping/:id/edit" element={<MappingFormPage />} />
                 {/* Legacy redirect: old per-mapping routes → global mapping page */}
                 <Route path="/mappings" element={<Navigate to="/mapping" replace />} />
                 <Route path="/mappings/new" element={<MappingFormPage />} />
@@ -40,6 +42,14 @@ export default function App() {
                 <Route path="/pipelines/new" element={<PipelineFormPage />} />
                 <Route path="/pipelines/:id" element={<PipelineDetailPage />} />
                 <Route path="/pipelines/:id/edit" element={<PipelineFormPage />} />
+                <Route
+                    path="/pipelines/:id/processors/new"
+                    element={<PipelineFormPage />}
+                />
+                <Route
+                    path="/pipelines/:id/processors/:processorId/edit"
+                    element={<PipelineFormPage />}
+                />
 
                 {/* Rules */}
                 <Route path="/rules" element={<RulesPage />} />

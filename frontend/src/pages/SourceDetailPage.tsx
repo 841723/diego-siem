@@ -4,6 +4,7 @@ import { deleteSource, getSource } from "../services/api";
 import type { SourceConfig } from "../types";
 import ConfirmModal from "../components/ConfirmModal";
 import LoadingState from "../components/LoadingState";
+import { usePipelines } from "../hooks/usePipelines";
 
 export default function SourceDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -13,6 +14,7 @@ export default function SourceDetailPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const { pipelines } = usePipelines();
 
     useEffect(() => {
         if (!id) return;
@@ -95,12 +97,17 @@ export default function SourceDetailPage() {
                         <dl className="overflow-hidden rounded-xl border border-border">
                             {(
                                 [
-                                    ["ID", String(source.id)],
                                     ["Nombre", source.name],
                                     ["Puerto", String(source.port)],
                                     ["Protocolo", source.protocol],
                                     ["Parser", source.parser],
-                                    ["Pipeline ID", String(source.pipelineid)],
+                                    [
+                                        "Pipeline",
+                                        pipelines.find(
+                                            (pipeline) =>
+                                                pipeline.id === source.pipelineid,
+                                        )?.name ?? "Pipeline desconocido",
+                                    ],
                                 ] as [string, string][]
                             ).map(([label, value], i) => (
                                 <div
