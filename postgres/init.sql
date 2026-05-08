@@ -31,6 +31,7 @@ CREATE TABLE PipelineProcessor (
     ProcessorID UUID NOT NULL,
     Config JSONB NOT NULL,
     OrderInPipeline INT NOT NULL,
+    HumanDescription TEXT,
     FOREIGN KEY (PipelineID) REFERENCES Pipeline(ID),
     FOREIGN KEY (ProcessorID) REFERENCES Processor(ID)
 );

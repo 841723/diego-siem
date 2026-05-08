@@ -145,7 +145,6 @@ func (s *SourceManager) UpdateSource(cfg model.SourceConfig) (*model.SourceConfi
 	cfgInDB, err := s.storage.GetSourceByPortAndProtocol(cfg.Port, cfg.Protocol)
 	if err != nil || cfgInDB.ID != cfg.ID {
 		// source with same port and protocol already exists, do not add to DB
-		fmt.Printf("Source with port %d and protocol %s already exists with ID %s\n", cfg.Port, cfg.Protocol, cfgInDB.ID)
 		return nil, errors.New("source with same port and protocol already exists")
 	}
 
@@ -174,17 +173,13 @@ func printPipelineProcessors(processors []model.PipelineProcessor) {
 
 func (s *SourceManager) UpdatePipelineInSourceConfig(updatedPipelineID model.ID) error {
 	for _, sourceRuntime := range s.sources {
-		fmt.Printf("Checking if source with pipeline ID %s uses updated pipeline ID %s\n", sourceRuntime.Config.PipelineID, updatedPipelineID)
 		if s.storage.SourceUsesPipeline(sourceRuntime.Config.PipelineID, updatedPipelineID) {
-			fmt.Printf("Source with pipeline ID %s uses updated pipeline ID %s, updating its pipeline processors\n", sourceRuntime.Config.PipelineID, updatedPipelineID)
 			newPipeline, err := s.storage.GetProcessorsByPipelineID(sourceRuntime.Config.PipelineID)
 			printPipelineProcessors(newPipeline)
 			if err != nil {
 				return err
 			}
 			sourceRuntime.PipelineProcessors = newPipeline
-		} else {
-			fmt.Printf("Source with pipeline ID %s does not use updated pipeline ID %s\n", sourceRuntime.Config.PipelineID, updatedPipelineID)
 		}
 	}
 	return nil
