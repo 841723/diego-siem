@@ -1,8 +1,14 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import ConfirmModal from "../components/ConfirmModal";
 import LoadingState from "../components/LoadingState";
 import { usePipelines } from "../hooks/usePipelines";
-import { createSource, getSource, updateSource } from "../services/api";
+import {
+    createSource,
+    deleteSource,
+    getSource,
+    updateSource,
+} from "../services/api";
 import type { SourceConfig } from "../types";
 
 type FormState = Omit<SourceConfig, "id">;
@@ -27,6 +33,7 @@ export default function SourceFormPage() {
     const [loadingItem, setLoadingItem] = useState(isEdit);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
+    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
     const pipelineOptions = useMemo(
         () => [...pipelines].sort((a, b) => a.name.localeCompare(b.name)),
@@ -75,7 +82,7 @@ export default function SourceFormPage() {
         try {
             if (isEdit && id) {
                 await updateSource(id, form);
-                navigate(`/sources/${id}`);
+                navigate("/sources");
             } else {
                 await createSource(form);
                 navigate("/sources");
@@ -87,13 +94,36 @@ export default function SourceFormPage() {
         }
     }
 
+    async function handleDeleteSource() {
+        if (!id) return;
+        setSubmitting(true);
+        setError("");
+        try {
+            await deleteSource(id);
+            navigate("/sources");
+        } catch (err) {
+            setError((err as Error).message || "Error eliminando fuente");
+            setSubmitting(false);
+            setConfirmDeleteOpen(false);
+        }
+    }
+
+    function duplicateSource() {
+        navigate("/sources/new", {
+            state: {
+                ...form,
+                name: `${form.name} (copia)`,
+            } satisfies Partial<FormState>,
+        });
+    }
+
     if (loadingItem) return <LoadingState message='Cargando fuente…' />;
 
     return (
         <main className='flex flex-col h-full overflow-hidden'>
             <div className='flex items-center gap-4 border-b border-border bg-background px-6 py-4 shrink-0'>
                 <button
-                    onClick={() => navigate(isEdit && id ? `/sources/${id}` : "/sources")}
+                    onClick={() => navigate("/sources")}
                     className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
                 >
                     ← Volver
@@ -101,6 +131,24 @@ export default function SourceFormPage() {
                 <h1 className='text-xl font-semibold text-text-logo'>
                     {isEdit ? "Editar fuente" : "Nueva fuente"}
                 </h1>
+                {isEdit && (
+                    <div className='ml-auto flex items-center gap-2'>
+                        <button
+                            type='button'
+                            onClick={duplicateSource}
+                            className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
+                        >
+                            Duplicar
+                        </button>
+                        <button
+                            type='button'
+                            onClick={() => setConfirmDeleteOpen(true)}
+                            className='rounded border border-error/50 px-3 py-1.5 text-sm text-error hover:bg-error/10'
+                        >
+                            Eliminar
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className='flex-1 overflow-y-auto p-6'>
@@ -216,9 +264,7 @@ export default function SourceFormPage() {
                             </button>
                             <button
                                 type='button'
-                                onClick={() =>
-                                    navigate(isEdit && id ? `/sources/${id}` : "/sources")
-                                }
+                                onClick={() => navigate("/sources")}
                                 className='rounded border border-border px-5 py-2 text-sm text-muted hover:bg-primary/30'
                             >
                                 Cancelar
@@ -227,6 +273,14 @@ export default function SourceFormPage() {
                     </form>
                 </div>
             </div>
+
+            <ConfirmModal
+                open={confirmDeleteOpen}
+                title='Eliminar fuente'
+                message='¿Seguro que quieres eliminar esta fuente?'
+                onConfirm={handleDeleteSource}
+                onCancel={() => setConfirmDeleteOpen(false)}
+            />
         </main>
     );
 }

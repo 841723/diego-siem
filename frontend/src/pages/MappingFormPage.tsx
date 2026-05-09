@@ -1,6 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import ConfirmModal from "../components/ConfirmModal";
 import LoadingState from "../components/LoadingState";
 import {
     FALLBACK_MAPPING_TYPES,
@@ -23,11 +22,9 @@ export default function MappingFormPage() {
         error: loadError,
         refetch,
     } = useGlobalMapping();
-
     const [draft, setDraft] = useState<MappingField | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
-    const [confirmDelete, setConfirmDelete] = useState(false);
 
     const isCreate = id === undefined;
     const decodedId = decodeURIComponent(id ?? "");
@@ -54,7 +51,7 @@ export default function MappingFormPage() {
             setDraft(null);
             return;
         }
-        setDraft(fields[index]);
+        setDraft({ ...fields[index] });
     }, [defaultTypeId, fields, index, isCreate]);
 
     const typeOptions = useMemo(
@@ -65,6 +62,10 @@ export default function MappingFormPage() {
             })),
         [effectiveTypes],
     );
+
+    function closeDrawer() {
+        navigate("/mapping");
+    }
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -78,14 +79,11 @@ export default function MappingFormPage() {
         setError("");
         try {
             const next = [...fields];
-            if (isCreate) {
-                next.push(draft);
-            } else {
-                next[index] = draft;
-            }
+            if (isCreate) next.push(draft);
+            else next[index] = draft;
             await setGlobalMapping(next);
             refetch();
-            navigate("/mapping");
+            closeDrawer();
         } catch (err) {
             setError((err as Error).message || "Error guardando el mapping");
         } finally {
@@ -93,153 +91,144 @@ export default function MappingFormPage() {
         }
     }
 
-    async function handleDelete() {
-        if (isCreate || index < 0 || index >= fields.length) {
-            return;
-        }
-        setSubmitting(true);
-        try {
-            const next = fields.filter((_, fieldIndex) => fieldIndex !== index);
-            await setGlobalMapping(next);
-            refetch();
-            navigate("/mapping");
-        } catch (err) {
-            setError((err as Error).message || "Error eliminando el campo");
-            setSubmitting(false);
-            setConfirmDelete(false);
-        }
-    }
-
     if (loading) return <LoadingState message='Cargando mapping…' />;
 
-    if (!isCreate && !draft) {
-        return (
-            <main className='p-6'>
-                <p className='rounded bg-error/20 px-3 py-2 text-sm text-error'>
-                    Campo no encontrado.
-                </p>
-            </main>
-        );
-    }
-
     return (
-        <main className='flex flex-col h-full overflow-hidden'>
-            <div className='flex items-center justify-between gap-4 border-b border-border bg-background px-6 py-4 shrink-0'>
-                <div className='flex items-center gap-4'>
-                    <button
-                        onClick={() => navigate("/mapping")}
-                        className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
-                    >
-                        ← Volver
-                    </button>
-                    <h1 className='text-xl font-semibold text-text-logo'>
-                        {isCreate ? "Nuevo campo" : "Editar campo"}
-                    </h1>
-                </div>
-                {!isCreate && (
-                    <button
-                        onClick={() => setConfirmDelete(true)}
-                        className='rounded border border-error/50 px-3 py-1.5 text-sm text-error hover:bg-error/10'
-                    >
-                        Eliminar
-                    </button>
-                )}
-            </div>
-
-            <div className='flex-1 overflow-y-auto p-6'>
-                <div className='mx-auto max-w-lg'>
-                    <form onSubmit={handleSubmit} className='space-y-4'>
-                        <div className='space-y-1'>
-                            <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
-                                Campo
-                            </label>
-                            <input
-                                className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
-                                value={draft?.fieldname ?? ""}
-                                onChange={(event) =>
-                                    setDraft((prev) =>
-                                        prev
-                                            ? { ...prev, fieldname: event.target.value }
-                                            : prev,
-                                    )
-                                }
-                                required
-                            />
-                        </div>
-
-                        <div className='space-y-1'>
-                            <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
-                                Tipo
-                            </label>
-                            <select
-                                className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
-                                value={draft?.fieldtypeid ?? defaultTypeId}
-                                onChange={(event) =>
-                                    setDraft((prev) =>
-                                        prev
-                                            ? { ...prev, fieldtypeid: event.target.value }
-                                            : prev,
-                                    )
-                                }
-                            >
-                                {typeOptions.map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className='space-y-1'>
-                            <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
-                                Valor por defecto
-                            </label>
-                            <input
-                                className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
-                                value={draft?.defaultvalue ?? ""}
-                                onChange={(event) =>
-                                    setDraft((prev) =>
-                                        prev
-                                            ? { ...prev, defaultvalue: event.target.value }
-                                            : prev,
-                                    )
-                                }
-                            />
-                        </div>
-
-                        {(loadError || error) && (
-                            <p className='rounded bg-error/20 px-3 py-2 text-sm text-error'>
-                                {loadError || error}
-                            </p>
-                        )}
-
-                        <div className='flex gap-3 pt-2'>
-                            <button
-                                type='submit'
-                                disabled={submitting}
-                                className='rounded bg-accent px-5 py-2 text-sm font-semibold text-white hover:bg-accent/80 disabled:opacity-50'
-                            >
-                                {submitting ? "Guardando…" : "Guardar cambios"}
-                            </button>
-                            <button
-                                type='button'
-                                onClick={() => navigate("/mapping")}
-                                className='rounded border border-border px-5 py-2 text-sm text-muted hover:bg-primary/30'
-                            >
-                                Cancelar
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <ConfirmModal
-                open={confirmDelete}
-                title='Eliminar campo'
-                message='¿Seguro que quieres eliminar este campo del mapping?'
-                onConfirm={handleDelete}
-                onCancel={() => setConfirmDelete(false)}
+        <div className='fixed inset-0 z-50'>
+            <div
+                className='absolute inset-0 bg-black/40'
+                onClick={closeDrawer}
+                aria-hidden='true'
             />
-        </main>
+            <aside
+                className='absolute right-0 top-0 h-full w-full max-w-xl border-l border-border bg-background shadow-2xl'
+                role='dialog'
+                aria-modal='true'
+                aria-label='Editar mapping'
+            >
+                <div className='flex h-full flex-col'>
+                    <div className='flex items-center justify-between border-b border-border px-6 py-4'>
+                        <h1 className='text-xl font-semibold text-text-logo'>
+                            {isCreate ? "Nuevo campo" : "Editar campo"}
+                        </h1>
+                        <button
+                            type='button'
+                            onClick={closeDrawer}
+                            className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
+                        >
+                            Cerrar
+                        </button>
+                    </div>
+
+                    <div className='flex-1 overflow-y-auto p-6'>
+                        {!isCreate && !draft ? (
+                            <p className='rounded bg-error/20 px-3 py-2 text-sm text-error'>
+                                Campo no encontrado.
+                            </p>
+                        ) : (
+                            <form
+                                id='mapping-form'
+                                onSubmit={handleSubmit}
+                                className='space-y-4'
+                            >
+                                <div className='space-y-1'>
+                                    <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                                        Campo
+                                    </label>
+                                    <input
+                                        className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                                        value={draft?.fieldname ?? ""}
+                                        onChange={(event) =>
+                                            setDraft((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          fieldname:
+                                                              event.target.value,
+                                                      }
+                                                    : prev,
+                                            )
+                                        }
+                                        required
+                                    />
+                                </div>
+
+                                <div className='space-y-1'>
+                                    <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                                        Tipo
+                                    </label>
+                                    <select
+                                        className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                                        value={draft?.fieldtypeid ?? defaultTypeId}
+                                        onChange={(event) =>
+                                            setDraft((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          fieldtypeid:
+                                                              event.target.value,
+                                                      }
+                                                    : prev,
+                                            )
+                                        }
+                                    >
+                                        {typeOptions.map((option) => (
+                                            <option key={option.id} value={option.id}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className='space-y-1'>
+                                    <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                                        Valor por defecto
+                                    </label>
+                                    <input
+                                        className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                                        value={draft?.defaultvalue ?? ""}
+                                        onChange={(event) =>
+                                            setDraft((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          defaultvalue:
+                                                              event.target.value,
+                                                      }
+                                                    : prev,
+                                            )
+                                        }
+                                    />
+                                </div>
+
+                                {(loadError || error) && (
+                                    <p className='rounded bg-error/20 px-3 py-2 text-sm text-error'>
+                                        {loadError || error}
+                                    </p>
+                                )}
+                            </form>
+                        )}
+                    </div>
+
+                    <div className='flex items-center justify-end gap-3 border-t border-border px-6 py-4'>
+                        <button
+                            type='button'
+                            onClick={closeDrawer}
+                            className='rounded border border-border px-5 py-2 text-sm text-muted hover:bg-primary/30'
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type='submit'
+                            form='mapping-form'
+                            disabled={submitting || (!isCreate && !draft)}
+                            className='rounded bg-accent px-5 py-2 text-sm font-semibold text-white hover:bg-accent/80 disabled:opacity-50'
+                        >
+                            {submitting ? "Guardando…" : "Guardar cambios"}
+                        </button>
+                    </div>
+                </div>
+            </aside>
+        </div>
     );
 }

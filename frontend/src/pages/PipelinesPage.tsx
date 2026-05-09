@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import DataTable from "../components/DataTable";
 import LoadingState from "../components/LoadingState";
 import { usePipelines } from "../hooks/usePipelines";
+import { useSources } from "../hooks/useSources";
 
 export default function PipelinesPage() {
     const { pipelines, loading, error } = usePipelines();
+    const { sources } = useSources();
     const navigate = useNavigate();
 
     const sortedPipelines = useMemo(
@@ -13,11 +15,21 @@ export default function PipelinesPage() {
         [pipelines],
     );
 
+    const sourceUsageByPipeline = useMemo(() => {
+        const usage = new Map<string, number>();
+        for (const source of sources) {
+            usage.set(source.pipelineid, (usage.get(source.pipelineid) ?? 0) + 1);
+        }
+        return usage;
+    }, [sources]);
+
     const tableRows = sortedPipelines.map((pipeline) => [
-        <span className='font-mono text-xs text-muted'>{pipeline.id.slice(0, 8)}…</span>,
         <span className='text-sm text-text'>{pipeline.name}</span>,
         <span className='text-xs text-muted line-clamp-2'>
             {pipeline.description || "—"}
+        </span>,
+        <span className='text-xs text-muted'>
+            Used by {sourceUsageByPipeline.get(pipeline.id) ?? 0} sources
         </span>,
     ]);
 
@@ -49,7 +61,7 @@ export default function PipelinesPage() {
                     <LoadingState message='Cargando pipelines…' />
                 ) : (
                     <DataTable
-                        headers={["ID", "Nombre", "Descripción"]}
+                        headers={["Nombre", "Descripción", "Uso"]}
                         rows={tableRows}
                         emptyMessage='No hay pipelines configurados'
                         onRowClick={(rowIndex) =>
