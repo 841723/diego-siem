@@ -215,7 +215,7 @@ func appendAndUpdate(existing []model.PipelineProcessor, toAdd ...model.Pipeline
 	return existing
 }
 
-func (s *Storage) GetProcessorsByPipelineID(pipelineID model.ID) ([]model.PipelineProcessor, error) {
+func (s *Storage) GetCompiledPipelineByPipelineID(pipelineID model.ID) ([]model.PipelineProcessor, error) {
 	response, err := s.postgres.GetProcessorsFromPipelineInDB(pipelineID)
 	if err != nil {
 		return nil, err

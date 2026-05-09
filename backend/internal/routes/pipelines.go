@@ -80,7 +80,7 @@ func (h *PipelinesHandler) GetFullPipelineByID(c *gin.Context) {
 		return
 	}
 
-	processors, err := h.storage.GetProcessorsByPipelineID(id)
+	processors, err := h.storage.GetProcessorsFromPipeline(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

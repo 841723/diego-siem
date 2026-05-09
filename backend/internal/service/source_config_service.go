@@ -33,7 +33,7 @@ func (s *SourceManager) NewSourceConfigRuntime(cfg model.SourceConfig) model.ID 
 	storage_ch := make(chan model.Log, max_items_channels)
 	stop_ch := make(chan struct{})
 
-	pipeline, err := s.storage.GetProcessorsByPipelineID(cfg.PipelineID)
+	pipeline, err := s.storage.GetCompiledPipelineByPipelineID(cfg.PipelineID)
 	if err != nil || pipeline == nil {
 		// Handle error, for now we just return an empty pipeline
 		pipeline = []model.PipelineProcessor{}
@@ -170,7 +170,7 @@ func (s *SourceManager) UpdateSource(cfg model.SourceConfig) (*model.SourceConfi
 func (s *SourceManager) UpdatePipelineInSourceConfig(updatedPipelineID model.ID) error {
 	for _, sourceRuntime := range s.sources {
 		if s.storage.SourceUsesPipeline(sourceRuntime.Config.PipelineID, updatedPipelineID) {
-			newPipeline, err := s.storage.GetProcessorsByPipelineID(sourceRuntime.Config.PipelineID)
+			newPipeline, err := s.storage.GetCompiledPipelineByPipelineID(sourceRuntime.Config.PipelineID)
 			if err != nil {
 				return err
 			}
