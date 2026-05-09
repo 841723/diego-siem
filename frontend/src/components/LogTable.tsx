@@ -28,7 +28,7 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
     // }
 
     return (
-        <div className='flex-1 flex flex-col overflow-hidden'>
+        <div className='flex-1 flex flex-col overflow-hidden mb-4'>
             <div
                 className='grid bg-secondary text-white text-sm tracking-wider'
                 style={{
@@ -70,7 +70,7 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
                                                     ? "0 0.25rem 0.25rem 0"
                                                     : "0.25rem 0 0 0.25rem",
                                             transition:
-                                                "opacity 0.5s step-end 0s",
+                                                "opacity 0.5s ease 0s",
                                         }}
                                     >
                                         <button

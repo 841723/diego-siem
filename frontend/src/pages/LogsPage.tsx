@@ -102,13 +102,13 @@ export default function LogsPage() {
                         logs={paginatedLogs}
                         columns={columns}
                     />
-                    <Pagination
+                    {/* <Pagination
                         currentPage={page}
                         totalPages={totalPages}
                         onPageChange={setPage}
                         shownCount={paginatedLogs.length}
                         totalCount={filteredLogs.length}
-                    />
+                    /> */}
                 </div>
             </section>
         </main>

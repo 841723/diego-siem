@@ -21,7 +21,7 @@ export default function MappingsPage() {
     );
 
     const tableRows = fields.map((field) => [
-        <span className='text-sm text-text'>{field.fieldname || "(sin nombre)"}</span>,
+        <span className='text-sm text-muted'>{field.fieldname || "(sin nombre)"}</span>,
         <span className='text-xs text-muted'>
             {typeLabels.get(field.fieldtypeid) ?? field.fieldtypeid}
         </span>,

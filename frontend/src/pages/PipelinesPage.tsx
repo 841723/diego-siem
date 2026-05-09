@@ -24,7 +24,7 @@ export default function PipelinesPage() {
     }, [sources]);
 
     const tableRows = sortedPipelines.map((pipeline) => [
-        <span className='text-sm text-text'>{pipeline.name}</span>,
+        <span className='text-sm text-muted'>{pipeline.name}</span>,
         <span className='text-xs text-muted line-clamp-2'>
             {pipeline.description || "—"}
         </span>,
