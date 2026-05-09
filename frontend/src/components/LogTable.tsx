@@ -7,11 +7,7 @@ type Props = {
     columns: string[];
 };
 
-const getCellValue = (
-    loading: boolean,
-    log: LogEntry,
-    col: string,
-): string => {
+const getCellValue = (loading: boolean, log: LogEntry, col: string): string => {
     if (loading) return " ";
     if (col === "timestamp") return formatTimestamp(log.timestamp);
     if (col === "sourceid") return String(log.sourceid);
@@ -163,4 +159,3 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
         </div>
     );
 }
-

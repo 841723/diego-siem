@@ -6,7 +6,7 @@ import type { LogEntry, TimeWindow } from "../types";
 export const FIXED_PAGE_SIZE = 100;
 export const MAX_LOG_PAGES = 5;
 export const PAGE_SIZE_OPTIONS = [FIXED_PAGE_SIZE] as const;
-export const DEFAULT_COLUMNS = ["timestamp", "sourceid"];
+export const DEFAULT_COLUMNS = ["timestamp", "sourceid", "processed"];
 
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -23,7 +23,6 @@ export const TIME_WINDOWS: TimeWindow[] = [
 ];
 
 const DEFAULT_TIMEWINDOW = TIME_WINDOWS[2].value;
-const NO_COLUMNS_MARKER = "__NO_COLUMNS_SELECTED__";
 
 const TIMESTAMP_MS_THRESHOLD = 1_000_000_000_000;
 
@@ -87,7 +86,6 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
     const parseColumns = (): string[] => {
         const raw = searchParams.get("cols");
         if (!raw) return DEFAULT_COLUMNS;
-        if (raw === NO_COLUMNS_MARKER) return [];
         const cols = raw.split(",").filter(Boolean);
         return cols.length > 0 ? cols : DEFAULT_COLUMNS;
     };
@@ -232,7 +230,7 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
                 ? columns.filter((c) => c !== col)
                 : [...columns, col];
             updateParams({
-                cols: next.length > 0 ? next.join(",") : NO_COLUMNS_MARKER,
+                cols: next.length > 0 ? next.join(",") : "",
                 page: "1",
             });
             // eslint-disable-next-line react-hooks/exhaustive-deps

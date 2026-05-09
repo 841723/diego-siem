@@ -200,16 +200,35 @@ func (s *Storage) DeleteProcessorFromPipeline(processorID model.ID) error {
 	return s.postgres.DeleteProcessorFromPipelineInDB(processorID)
 }
 
+func appendAndUpdate(existing []model.PipelineProcessor, toAdd ...model.PipelineProcessor) []model.PipelineProcessor {
+	maxOrder := -1
+	if len(existing) > 0 {
+		maxOrder = existing[len(existing)-1].OrderInPipeline
+	}
+
+	for _, newProcessor := range toAdd {
+		newProcessor.OrderInPipeline = maxOrder + 1
+		existing = append(existing, newProcessor)
+		maxOrder++
+	}
+
+	return existing
+}
+
 func (s *Storage) GetProcessorsByPipelineID(pipelineID model.ID) ([]model.PipelineProcessor, error) {
 	response, err := s.postgres.GetProcessorsFromPipelineInDB(pipelineID)
 	if err != nil {
 		return nil, err
 	}
+	newResponse := []model.PipelineProcessor{}
 
 	for depth := 1; depth < s.maxDepth; depth++ {
-		var subProcessors []model.PipelineProcessor
+
 		for _, processor := range response {
-			if processor.Processor.Name == "Call Pipeline" {
+			processorsToAdd := []model.PipelineProcessor{}
+
+			if processor.Processor.Name == processors.GetCallPipelineProcessorName() {
+				// processor is a call pipeline processor
 				parsedConfig, err := processors.NewCallPipelineProcessor(processor.Config)
 				if err != nil {
 					return nil, err
@@ -218,14 +237,18 @@ func (s *Storage) GetProcessorsByPipelineID(pipelineID model.ID) ([]model.Pipeli
 				if err != nil {
 					return nil, err
 				}
-				subPipelineProcessors, err := s.postgres.GetProcessorsFromPipelineInDB(parsedPipelineID)
+				processorsToAdd, err = s.postgres.GetProcessorsFromPipelineInDB(parsedPipelineID)
 				if err != nil {
 					return nil, err
 				}
-				subProcessors = append(subProcessors, subPipelineProcessors...)
+				newResponse = appendAndUpdate(newResponse, processorsToAdd...)
+			} else {
+				// processor is a normal processor, just add it to the list
+				newResponse = appendAndUpdate(newResponse, processor)
 			}
 		}
-		response = append(response, subProcessors...)
+		response = make([]model.PipelineProcessor, len(newResponse))
+		copy(response, newResponse)
 	}
 
 	return response, nil

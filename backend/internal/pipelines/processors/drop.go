@@ -2,13 +2,14 @@ package processors
 
 import (
 	"encoding/json"
+	"errors"
 
 	"backend/internal/model"
 )
 
 /*
-	{
-	}
+{
+}
 */
 type Drop struct {
 	ProcessorMeta
@@ -16,7 +17,7 @@ type Drop struct {
 
 func (p *Drop) Process(logData model.LogData) error {
 	// Implementa la lógica de procesamiento aquí
-	return nil
+	return GetDropProcessorError() 
 }
 
 func NewDropProcessor(config model.PipelineProcessorConfig) (*Drop, error) {
@@ -28,6 +29,12 @@ func NewDropProcessor(config model.PipelineProcessorConfig) (*Drop, error) {
 
 	DropConfig.ProcessorMeta = WithMeta("Drop", "Drops the log entry if a field matches a certain value", "{}")
 	return &DropConfig, nil
+}
+
+// dropProcessorError.Error()
+var errDropProcessor = errors.New("Log dropped by Drop processor")
+func GetDropProcessorError() error {
+	return errDropProcessor
 }
 
 func init() {

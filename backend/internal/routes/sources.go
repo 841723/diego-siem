@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"fmt"
 	"net/http"
 
 	"backend/internal/model"
@@ -49,7 +48,6 @@ func (h *SourceHandler) GetSources(c *gin.Context) {
 func (h *SourceHandler) GetSourceByID(c *gin.Context) {
 	strId := c.Param("id")
 	id, err := model.ParseAndCheckUUID(strId)
-	fmt.Printf("Received GetSourceByID request with ID: %s\n", strId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid source ID"})
 		return

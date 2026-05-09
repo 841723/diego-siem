@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"time"
 
 	"backend/internal/model"
@@ -95,11 +94,6 @@ func New() *App {
 func Run() {
 	app := New()
 
-	fmt.Println("Sources initialized")
-	go app.initSources()
-
-	fmt.Println("Waiting for logs from sources...")
-
-	fmt.Println("API initialized")
+	app.initSources()
 	app.initAPI()
 }

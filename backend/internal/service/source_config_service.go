@@ -7,6 +7,7 @@ import (
 
 	"backend/internal/model"
 	"backend/internal/pipelines"
+	"backend/internal/pipelines/processors"
 	"backend/internal/source"
 	"backend/internal/storage"
 )
@@ -56,7 +57,9 @@ func (src *SourceConfigRuntime) waitAndProcessLogs(s *storage.Storage) {
 		case log := <-src.ParsedCh:
 			log, err := pipelines.ProcessLog(log, src.PipelineProcessors)
 			if err != nil {
-				// Handle error
+				if !errors.Is(err, processors.GetDropProcessorError()) {
+					fmt.Printf("Error processing log in source %s: %v\n", src.Config.Name, err)
+				}
 				continue
 			}
 			src.StorageCh <- log
@@ -164,18 +167,10 @@ func (s *SourceManager) UpdateSource(cfg model.SourceConfig) (*model.SourceConfi
 	return &cfg, nil
 }
 
-func printPipelineProcessors(processors []model.PipelineProcessor) {
-	fmt.Printf("Pipeline Processors:\n")
-	for _, p := range processors {
-		fmt.Printf("- Processor ID: %s, Pipeline ID: %s, Order: %d\n", p.ProcessorID, p.PipelineID, p.OrderInPipeline)
-	}
-}
-
 func (s *SourceManager) UpdatePipelineInSourceConfig(updatedPipelineID model.ID) error {
 	for _, sourceRuntime := range s.sources {
 		if s.storage.SourceUsesPipeline(sourceRuntime.Config.PipelineID, updatedPipelineID) {
 			newPipeline, err := s.storage.GetProcessorsByPipelineID(sourceRuntime.Config.PipelineID)
-			printPipelineProcessors(newPipeline)
 			if err != nil {
 				return err
 			}
