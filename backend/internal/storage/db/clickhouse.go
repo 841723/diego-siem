@@ -2,9 +2,9 @@ package db
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
+	"reflect"
 	"strings"
 	"time"
 
@@ -71,12 +71,6 @@ func (db *ClickHouseDB) GetVersion() (string, error) {
 **********************************************************/
 
 func (db *ClickHouseDB) LogToDB(log map[string]interface{}) error {
-	data, err := json.Marshal(log)
-	if err != nil {
-		return fmt.Errorf("failed to marshal log data: %w", err)
-	}
-	log["data"] = string(data)
-	// Construye la lista de columnas a partir de las keys del map, excluyendo "data" si ya fue procesado
 	var columns []string
 	var values []interface{}
 	for k, v := range log {
@@ -112,36 +106,68 @@ func (db *ClickHouseDB) LogToDB(log map[string]interface{}) error {
 	return nil
 }
 
-func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsRequest) ([]model.Log, error) {
+func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsRequest, dynamicColumns []model.Mapping) ([]model.Log, error) {
 	ctx := context.Background()
-	rows, err := db.conn.Query(ctx, "SELECT logid, timestamp, sourceid, data FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?", params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
+
+	fixedColumns := []string{"logid", "timestamp", "sourceid", "data"}
+
+	allColumns := make([]string, len(fixedColumns), len(fixedColumns)+len(dynamicColumns))
+	copy(allColumns, fixedColumns)
+	for _, col := range dynamicColumns {
+		allColumns = append(allColumns, col.FieldName)
+	}
+
+	query := fmt.Sprintf(
+		"SELECT %s FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+		strings.Join(allColumns, ", "),
+	)
+	rows, err := db.conn.Query(ctx, query, params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query logs: %w", err)
+		return nil, err
 	}
 	defer rows.Close()
+	columnTypes := rows.ColumnTypes()
 
-	var logs []model.Log
+	var results []model.Log
+
 	for rows.Next() {
-		var log model.Log
-		var sourceID model.ID
+		var (
+			id        model.ID
+			timestamp time.Time
+			sourceID  model.ID
+			data      map[string]any
+		)
 
-		var data map[string]interface{}
-		if err := rows.Scan(&log.ID, &log.Timestamp, &sourceID, &data); err != nil {
-			return nil, fmt.Errorf("failed to scan log row: %w", err)
+		scanTargets := make([]any, len(allColumns))
+		scanTargets[0] = &id
+		scanTargets[1] = &timestamp
+		scanTargets[2] = &sourceID
+		scanTargets[3] = &data
+
+		for i := range dynamicColumns {
+			ptr := reflect.New(columnTypes[len(fixedColumns)+i].ScanType())
+			scanTargets[len(fixedColumns)+i] = ptr.Interface()
 		}
-		log.SourceID = sourceID
-		log.Data = data
 
-		logs = append(logs, log)
+		if err := rows.Scan(scanTargets...); err != nil {
+			return nil, err
+		}
+
+		logData := model.LogData(data)
+		for i, col := range dynamicColumns {
+			ptr := scanTargets[len(fixedColumns)+i]
+			logData[col.FieldName] = reflect.ValueOf(ptr).Elem().Interface()
+		}
+
+		results = append(results, model.Log{
+			ID:        id,
+			Timestamp: timestamp,
+			SourceID:  sourceID,
+			Data:      logData,
+		})
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating log rows: %w", err)
-	}
-
-	fmt.Printf("Retrieved %d logs from ClickHouse®\n", len(logs))
-
-	return logs, nil
+	return results, rows.Err()
 }
 
 func (db *ClickHouseDB) GetAggsFromDB(params model.GetLogsRequest, aggs model.AggsParam) ([]model.AggsBucket, error) {

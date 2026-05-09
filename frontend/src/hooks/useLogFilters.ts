@@ -163,9 +163,22 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
     const availableColumns = useMemo(() => {
         const set = new Set<string>(DEFAULT_COLUMNS);
         columns.forEach((column) => set.add(column));
-        logs.forEach((log) =>
-            Object.keys(log.data ?? {}).forEach((f) => set.add(f)),
-        );
+
+        logs.forEach((log) => {
+            if (log.data) {
+                const flatten = (obj: Record<string, unknown>, prefix = "") => {
+                    Object.entries(obj).forEach(([key, value]) => {
+                        const newKey = prefix ? `${prefix}.${key}` : key;
+                        set.add(newKey);
+                        if (typeof value === "object" && value !== null) {
+                            flatten(value as Record<string, unknown>, newKey);
+                        }
+                    });
+                };
+                flatten(log.data);
+            }
+        });
+
         return Array.from(set);
     }, [logs, columns]);
 

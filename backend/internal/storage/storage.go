@@ -54,7 +54,6 @@ func formatLogForStorage(value interface{}, fieldType string) (interface{}, erro
 			return nil, fmt.Errorf("expected numeric or string value for int field, got %T", value)
 		}
 		return int32(intVal), nil
-
 	case "float":
 		floatValue, ok := value.(float64)
 		if !ok {
@@ -114,7 +113,11 @@ func (s *Storage) StoreLog(log model.Log) error {
 
 func (s *Storage) GetLogs(params model.GetLogsRequest) ([]model.Log, error) {
 	fmt.Printf("Received GetLogs request with TimeWindow: %s\n", params.TimeWindow)
-	return s.clickhouse.GetLogsFromDB(params)
+	dynamicColumns, err := s.GetMappings()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mappings: %w", err)
+	}
+	return s.clickhouse.GetLogsFromDB(params, dynamicColumns)
 }
 
 func (s *Storage) CountLogs(params model.GetLogsRequest) (int, error) {
