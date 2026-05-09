@@ -60,6 +60,7 @@ type Mapping struct {
 	FieldName    string `json:"fieldname"`
 	FieldTypeID  ID     `json:"fieldtypeid"`
 	DefaultValue string `json:"defaultvalue"`
+	FieldType    MappingType
 }
 
 /*
@@ -69,11 +70,27 @@ type Mapping struct {
 
 **************************************************************
 */
-type GetLogsParams struct {
-	TimeWindow    string `json:"timeWindow"`
-	From          int    `json:"from"`
-	Size          int    `json:"size"`
-	SourceID      ID     `json:"sourceid"`
+
+type QueryParams struct {
+	// Define your query parameters here, e.g.:
+	Match map[string]interface{} `json:"match,omitempty"`
+	Range map[string]interface{} `json:"range,omitempty"`
+	// Add more query types as needed
+}
+type AggsParam struct {
+	Type     string `json:"type"` // e.g., "terms", "histogram", "avg"
+	Name     string `json:"name"`
+	Field    string `json:"field"`
+	Interval string `json:"interval,omitempty"` // Only for histogram
+}
+
+type GetLogsRequest struct {
+	TimeWindow    string      `json:"timeWindow"`
+	From          int         `json:"from"`
+	Size          int         `json:"size"`
+	Query         QueryParams `json:"query"`
+	Aggs          []AggsParam `json:"aggs"`
+	SourceID      ID
 	TimestampFrom string
 	TimestampTo   string
 }
@@ -86,4 +103,16 @@ type ColumnRequest struct {
 type FullPipelineResponse struct {
 	Pipeline   Pipeline            `json:"pipeline"`
 	Processors []PipelineProcessor `json:"processors"`
+}
+
+type GetLogsResponse struct {
+	Logs  []Log                   `json:"logs"`
+	Total int                     `json:"total"`
+	Aggs  map[string][]AggsBucket `json:"aggs,omitempty"`
+}
+
+type AggsBucket struct {
+	Key      interface{} `json:"key"`
+	Value    interface{} `json:"value,omitempty"`
+	DocCount int         `json:"doc_count,omitempty"`
 }

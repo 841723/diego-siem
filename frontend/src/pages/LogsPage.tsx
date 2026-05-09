@@ -3,7 +3,6 @@ import Pagination from "../components/Pagination";
 import LogTable from "../components/LogTable";
 import Select from "../components/Select";
 import {
-    PAGE_SIZE_OPTIONS,
     TIME_WINDOWS,
     useLogFilters,
 } from "../hooks/useLogFilters";
@@ -12,6 +11,9 @@ import type { SourceConfig } from "../types";
 
 export default function LogsPage() {
     const { sources } = useSources();
+    const sortedSources = [...sources].sort((a, b) =>
+        a.name.localeCompare(b.name),
+    );
     const sourceIds = sources.map((s) => s.id);
 
     const filters = useLogFilters(sourceIds);
@@ -21,7 +23,6 @@ export default function LogsPage() {
         filterText,
         columns,
         page,
-        pageSize,
         totalLogs,
         timeWindow,
         setSource,
@@ -29,7 +30,6 @@ export default function LogsPage() {
         setFilterText,
         toggleColumn,
         setPage,
-        setPageSize,
         filteredLogs,
         paginatedLogs,
         availableColumns,
@@ -49,7 +49,7 @@ export default function LogsPage() {
 
             <header className='flex flex-wrap gap-4 bg-background p-4  pt-2'>
                 <Select
-                    list={sources.sort((a, b) => a.name.localeCompare(b.name))}
+                    list={sortedSources}
                     selected={String(sourceId)}
                     getValue={(item) => String(item.id)}
                     onSelect={(item: SourceConfig | null) =>
@@ -78,14 +78,6 @@ export default function LogsPage() {
                     renderOption={(item) => item.label}
                     label='Ventana'
                 />
-                {/* <Select
-                    list={PAGE_SIZE_OPTIONS}
-                    selected={pageSize.toString()}
-                    getValue={(item) => item.toString()}
-                    onSelect={(item) => item && setPageSize(Number(item))}
-                    renderOption={(item) => item.toString()}
-                    label='Cantidad'
-                /> */}
                 <button
                     className='self-end rounded bg-accent px-3 py-2 text-sm text-muted font-semibold uppercase tracking-wider hover:bg-accent/80 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 h-[37.6px] w-20'
                     onClick={refetchLogs}
@@ -110,16 +102,13 @@ export default function LogsPage() {
                         logs={paginatedLogs}
                         columns={columns}
                     />
-                    <Pagination
+                    {/* <Pagination
                         currentPage={page}
                         totalPages={totalPages}
                         onPageChange={setPage}
                         shownCount={paginatedLogs.length}
                         totalCount={filteredLogs.length}
-                        pageSize={pageSize}
-                        pageSizeOptions={PAGE_SIZE_OPTIONS}
-                        onPageSizeChange={setPageSize}
-                    />
+                    /> */}
                 </div>
             </section>
         </main>

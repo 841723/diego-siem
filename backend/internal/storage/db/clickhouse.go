@@ -2,9 +2,10 @@ package db
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
+	"reflect"
+	"strings"
 	"time"
 
 	"backend/internal/model"
@@ -63,58 +64,146 @@ func (db *ClickHouseDB) GetVersion() (string, error) {
 	return version, nil
 }
 
-func (db *ClickHouseDB) LogToDB(log model.Log) error {
-	// Convert log.Data to JSON object string
-	data := "{}"
-	if log.Data != nil {
-		jsonData, err := json.Marshal(log.Data)
-		if err != nil {
-			return fmt.Errorf("failed to marshal log data: %w", err)
-		}
-		data = string(jsonData)
+/********************************************************
+
+						Logs
+
+**********************************************************/
+
+func (db *ClickHouseDB) LogToDB(log map[string]interface{}) error {
+	var columns []string
+	var values []interface{}
+	for k, v := range log {
+		columns = append(columns, k)
+		values = append(values, v)
+	}
+
+	// Luego, reordena los valores para que coincidan con las columnas ordenadas
+	var orderedValues []interface{}
+	for _, col := range columns {
+		orderedValues = append(orderedValues, log[col])
 	}
 
 	ctx := context.Background()
-	err := db.conn.Exec(ctx, "INSERT INTO logs (logid, timestamp, sourceid, data) VALUES (?, ?, ?, ?)", log.ID, log.Timestamp, log.SourceID, data)
+	// Especifica explícitamente las columnas en la consulta
+	query := fmt.Sprintf("INSERT INTO logs (%s)", strings.Join(columns, ", "))
+	batch, err := db.conn.PrepareBatch(ctx, query)
 	if err != nil {
-		return fmt.Errorf("failed to insert log: %w", err)
+		fmt.Printf("Error preparing batch: %v\n", err)
+		return fmt.Errorf("failed to prepare batch: %w", err)
+	}
+	defer batch.Close()
+
+	if err := batch.Append(orderedValues...); err != nil {
+		fmt.Printf("Error appending to batch: %v\n", err)
+		return fmt.Errorf("failed to append to batch: %w", err)
+	}
+
+	if err := batch.Send(); err != nil {
+		fmt.Printf("Error sending batch: %v\n", err)
+		return fmt.Errorf("failed to send batch: %w", err)
 	}
 	return nil
 }
 
-func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsParams) ([]model.Log, error) {
+func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsRequest, dynamicColumns []model.Mapping) ([]model.Log, error) {
 	ctx := context.Background()
-	rows, err := db.conn.Query(ctx, "SELECT logid, timestamp, sourceid, data FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?", params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
+
+	fixedColumns := []string{"logid", "timestamp", "sourceid", "data"}
+
+	allColumns := make([]string, len(fixedColumns), len(fixedColumns)+len(dynamicColumns))
+	copy(allColumns, fixedColumns)
+	for _, col := range dynamicColumns {
+		allColumns = append(allColumns, col.FieldName)
+	}
+
+	query := fmt.Sprintf(
+		"SELECT %s FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+		strings.Join(allColumns, ", "),
+	)
+	rows, err := db.conn.Query(ctx, query, params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query logs: %w", err)
+		return nil, err
+	}
+	defer rows.Close()
+	columnTypes := rows.ColumnTypes()
+
+	var results []model.Log
+
+	for rows.Next() {
+		var (
+			id        model.ID
+			timestamp time.Time
+			sourceID  model.ID
+			data      map[string]any
+		)
+
+		scanTargets := make([]any, len(allColumns))
+		scanTargets[0] = &id
+		scanTargets[1] = &timestamp
+		scanTargets[2] = &sourceID
+		scanTargets[3] = &data
+
+		for i := range dynamicColumns {
+			ptr := reflect.New(columnTypes[len(fixedColumns)+i].ScanType())
+			scanTargets[len(fixedColumns)+i] = ptr.Interface()
+		}
+
+		if err := rows.Scan(scanTargets...); err != nil {
+			return nil, err
+		}
+
+		logData := model.LogData(data)
+		for i, col := range dynamicColumns {
+			ptr := scanTargets[len(fixedColumns)+i]
+			logData[col.FieldName] = reflect.ValueOf(ptr).Elem().Interface()
+		}
+
+		results = append(results, model.Log{
+			ID:        id,
+			Timestamp: timestamp,
+			SourceID:  sourceID,
+			Data:      logData,
+		})
+	}
+
+	return results, rows.Err()
+}
+
+func (db *ClickHouseDB) GetAggsFromDB(params model.GetLogsRequest, aggs model.AggsParam) ([]model.AggsBucket, error) {
+	ctx := context.Background()
+
+	var query string
+	switch aggs.Interval {
+	case "1m", "5m", "1h", "1d":
+		query = fmt.Sprintf("SELECT %s, COUNT(*) as count FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? GROUP BY toStartOfInterval(timestamp, INTERVAL %s) ORDER BY toStartOfInterval(timestamp, INTERVAL %s)", aggs.Field, aggs.Interval, aggs.Interval)
+	default:
+		query = fmt.Sprintf("SELECT %s, COUNT(*) as count FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? GROUP BY %s", aggs.Field, aggs.Field)
+	}
+
+	rows, err := db.conn.Query(ctx, query, params.SourceID, params.TimestampFrom, params.TimestampTo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query aggs: %w", err)
 	}
 	defer rows.Close()
 
-	var logs []model.Log
+	var buckets []model.AggsBucket
 	for rows.Next() {
-		var log model.Log
-		var sourceID model.ID
-
-		var data map[string]interface{}
-		if err := rows.Scan(&log.ID, &log.Timestamp, &sourceID, &data); err != nil {
-			return nil, fmt.Errorf("failed to scan log row: %w", err)
+		var bucket model.AggsBucket
+		if err := rows.Scan(&bucket.Key, &bucket.DocCount); err != nil {
+			return nil, fmt.Errorf("failed to scan aggs row: %w", err)
 		}
-		log.SourceID = sourceID
-		log.Data = data
-
-		logs = append(logs, log)
+		buckets = append(buckets, bucket)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating log rows: %w", err)
+		return nil, fmt.Errorf("error iterating aggs rows: %w", err)
 	}
 
-	fmt.Printf("Retrieved %d logs from ClickHouse®\n", len(logs))
-
-	return logs, nil
+	return buckets, nil
 }
 
-func (db *ClickHouseDB) CountLogsFromDB(params model.GetLogsParams) (int, error) {
+func (db *ClickHouseDB) CountLogsFromDB(params model.GetLogsRequest) (int, error) {
 	ctx := context.Background()
 	var count uint64
 	//     "error": "failed to count logs: clickhouse [ScanRow]: (COUNT()) converting UInt64 to *int is unsupported. try using *uint64"
@@ -136,15 +225,22 @@ func (db *ClickHouseDB) DeleteLogsFromDB() error {
 	return nil
 }
 
+/*******************************************************
+
+						Columns
+
+**********************************************************/
+
 func (db *ClickHouseDB) AddColumnToLogsInDB(columnname string, datatype string) error {
 	ctx := context.Background()
 
 	if !isValidClickHouseColumnName(columnname) {
 		return fmt.Errorf("invalid column name: %s", columnname)
 	}
-	
+
 	query := fmt.Sprintf("ALTER TABLE logs ADD COLUMN IF NOT EXISTS %s %s", columnname, datatype)
 
+	fmt.Println(query)
 	err := db.conn.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to add column: %w", err)
@@ -166,4 +262,25 @@ func (db *ClickHouseDB) RemoveColumnFromLogsInDB(columnname string) error {
 		return fmt.Errorf("failed to remove column: %w", err)
 	}
 	return nil
+}
+
+/*******************************************************
+
+						Aggs
+
+**********************************************************/
+
+func (db *ClickHouseDB) GetMeanOfFieldFromDB(req model.GetLogsRequest, fieldName string) (float64, error) {
+	ctx := context.Background()
+	var mean float64
+
+	if !isValidClickHouseColumnName(fieldName) {
+		return 0, fmt.Errorf("invalid field name: %s", fieldName)
+	}
+
+	err := db.conn.QueryRow(ctx, fmt.Sprintf("SELECT AVG(%s) FROM logs WHERE sourceid = ?", fieldName), req.SourceID).Scan(&mean)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get mean of field: %w", err)
+	}
+	return mean, nil
 }

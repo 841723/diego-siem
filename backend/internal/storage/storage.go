@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"strconv"
 
 	"backend/internal/model"
 	"backend/internal/pipelines/processors"
@@ -23,27 +24,119 @@ func NewStorage() *Storage {
 	}
 }
 
-/**********************************************************
+/*
+*********************************************************
 
-						Logs
+	Logs
 
-**********************************************************/
+*********************************************************
+*/
+func formatLogForStorage(value interface{}, fieldType string) (interface{}, error) {
+	switch fieldType {
+	case "text":
+		strValue, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("expected string value for field, got %T", value)
+		}
+		return strValue, nil
+	case "int":
+		var intVal int64
+		var err error
+		switch v := value.(type) {
+		case float64:
+			intVal = int64(v)
+		case string:
+			intVal, err = strconv.ParseInt(v, 10, 32)
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse string '%s' as int32: %w", v, err)
+			}
+		default:
+			return nil, fmt.Errorf("expected numeric or string value for int field, got %T", value)
+		}
+		return int32(intVal), nil
+	case "float":
+		floatValue, ok := value.(float64)
+		if !ok {
+			return nil, fmt.Errorf("expected numeric value for field, got %T", value)
+		}
+		return floatValue, nil
+	case "bool":
+		boolValue, ok := value.(bool)
+		if !ok {
+			return nil, fmt.Errorf("expected boolean value for field, got %T", value)
+		}
+		return boolValue, nil
+
+	case "uuid":
+		strValue, ok := value.(model.ID)
+		if !ok {
+			return nil, fmt.Errorf("expected string value for uuid field, got %T", value)
+		}
+		return strValue, nil
+	default:
+		return nil, fmt.Errorf("unsupported field type: %s", fieldType)
+	}
+}
 
 func (s *Storage) StoreLog(log model.Log) error {
-	return s.clickhouse.LogToDB(log)
+	logToStore := map[string]interface{}{
+		"timestamp": log.Timestamp,
+		"sourceid":  log.SourceID,
+		"logid":     log.ID,
+	}
+
+	mappings, err := s.GetMappings()
+	if err != nil {
+		return fmt.Errorf("failed to get mappings: %w", err)
+	}
+
+	for _, mapping := range mappings {
+		var valueToFormat interface{}
+		if value, ok := log.Data[mapping.FieldName]; ok {
+			valueToFormat = value
+		} else if mapping.DefaultValue != "" {
+			valueToFormat = mapping.DefaultValue
+		} else {
+			valueToFormat = nil
+		}
+		formattedValue, err := formatLogForStorage(valueToFormat, mapping.FieldType.TypeName)
+		if err == nil {
+			logToStore[mapping.FieldName] = formattedValue
+			delete(log.Data, mapping.FieldName)
+		}
+	}
+
+	logToStore["data"] = log.Data
+
+	return s.clickhouse.LogToDB(logToStore)
 }
 
-func (s *Storage) GetLogs(params model.GetLogsParams) ([]model.Log, error) {
+func (s *Storage) GetLogs(params model.GetLogsRequest) ([]model.Log, error) {
 	fmt.Printf("Received GetLogs request with TimeWindow: %s\n", params.TimeWindow)
-	return s.clickhouse.GetLogsFromDB(params)
+	dynamicColumns, err := s.GetMappings()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mappings: %w", err)
+	}
+	return s.clickhouse.GetLogsFromDB(params, dynamicColumns)
 }
 
-func (s *Storage) CountLogs(params model.GetLogsParams) (int, error) {
+func (s *Storage) CountLogs(params model.GetLogsRequest) (int, error) {
 	return s.clickhouse.CountLogsFromDB(params)
 }
 
 func (s *Storage) DeleteLogs() error {
 	return s.clickhouse.DeleteLogsFromDB()
+}
+
+/*
+*********************************************************
+
+	Aggs
+
+*********************************************************
+*/
+func (s *Storage) GetMeanOfField(req model.GetLogsRequest, fieldName string) (float64, error) {
+	return s.clickhouse.GetMeanOfFieldFromDB(req, fieldName)
 }
 
 /**********************************************************
@@ -79,6 +172,12 @@ func (s *Storage) ClearSources() error {
 func (s *Storage) DeleteSourceByID(sourceID model.ID) error {
 	return s.postgres.DeleteSourceByIDFromDB(sourceID)
 }
+
+/*******************************************************
+
+						Columns
+
+**********************************************************/
 
 func (s *Storage) AddColumnToLogs(columnName, dataType string) error {
 	if ok, err := s.postgres.IsValidMappingType(dataType); !ok {
@@ -200,16 +299,35 @@ func (s *Storage) DeleteProcessorFromPipeline(processorID model.ID) error {
 	return s.postgres.DeleteProcessorFromPipelineInDB(processorID)
 }
 
-func (s *Storage) GetProcessorsByPipelineID(pipelineID model.ID) ([]model.PipelineProcessor, error) {
+func appendAndUpdate(existing []model.PipelineProcessor, toAdd ...model.PipelineProcessor) []model.PipelineProcessor {
+	maxOrder := -1
+	if len(existing) > 0 {
+		maxOrder = existing[len(existing)-1].OrderInPipeline
+	}
+
+	for _, newProcessor := range toAdd {
+		newProcessor.OrderInPipeline = maxOrder + 1
+		existing = append(existing, newProcessor)
+		maxOrder++
+	}
+
+	return existing
+}
+
+func (s *Storage) GetCompiledPipelineByPipelineID(pipelineID model.ID) ([]model.PipelineProcessor, error) {
 	response, err := s.postgres.GetProcessorsFromPipelineInDB(pipelineID)
 	if err != nil {
 		return nil, err
 	}
+	newResponse := []model.PipelineProcessor{}
 
 	for depth := 1; depth < s.maxDepth; depth++ {
-		var subProcessors []model.PipelineProcessor
+
 		for _, processor := range response {
-			if processor.Processor.Name == "Call Pipeline" {
+			processorsToAdd := []model.PipelineProcessor{}
+
+			if processor.Processor.Name == processors.GetCallPipelineProcessorName() {
+				// processor is a call pipeline processor
 				parsedConfig, err := processors.NewCallPipelineProcessor(processor.Config)
 				if err != nil {
 					return nil, err
@@ -218,14 +336,18 @@ func (s *Storage) GetProcessorsByPipelineID(pipelineID model.ID) ([]model.Pipeli
 				if err != nil {
 					return nil, err
 				}
-				subPipelineProcessors, err := s.postgres.GetProcessorsFromPipelineInDB(parsedPipelineID)
+				processorsToAdd, err = s.postgres.GetProcessorsFromPipelineInDB(parsedPipelineID)
 				if err != nil {
 					return nil, err
 				}
-				subProcessors = append(subProcessors, subPipelineProcessors...)
+				newResponse = appendAndUpdate(newResponse, processorsToAdd...)
+			} else {
+				// processor is a normal processor, just add it to the list
+				newResponse = appendAndUpdate(newResponse, processor)
 			}
 		}
-		response = append(response, subProcessors...)
+		response = make([]model.PipelineProcessor, len(newResponse))
+		copy(response, newResponse)
 	}
 
 	return response, nil
@@ -247,15 +369,55 @@ func (s *Storage) GetProcessorsByID(pipelineID model.ID) ([]model.Processor, err
 *********************************************************
 */
 func (s *Storage) AddMapping(mapping model.Mapping) error {
-	return s.postgres.AddMappingToDB(mapping)
+	err := s.postgres.AddMappingToDB(mapping)
+	if err != nil {
+		return err
+	}
+
+	mapping.FieldType, err = s.GetMappingTypesByID(mapping.FieldTypeID)
+	if err != nil {
+		return fmt.Errorf("failed to get mapping type: %w", err)
+	}
+
+	err = s.AddColumnToLogs(mapping.FieldName, mapping.FieldType.TypeName)
+	if err != nil {
+		// Rollback mapping addition if adding column fails
+		rollbackErr := s.postgres.DeleteMappingFromDB(mapping.FieldName)
+		if rollbackErr != nil {
+			fmt.Printf("Failed to rollback mapping addition for field %s: %v\n", mapping.FieldName, rollbackErr)
+		}
+		return fmt.Errorf("failed to add column for mapping: %w", err)
+	}
+	return nil
 }
 
 func (s *Storage) GetMappings() ([]model.Mapping, error) {
 	return s.postgres.GetMappingsFromDB()
 }
 
-func (s *Storage) DeleteMappings() error {
-	return s.postgres.DeleteMappingsFromDB()
+func (s *Storage) DeleteMapping(mappingID string) error {
+	var mapping model.Mapping
+	var err error
+	mapping.FieldType, err = s.GetMappingTypesByID(mapping.FieldTypeID)
+	if err != nil {
+		return fmt.Errorf("failed to get mapping for deletion: %w", err)
+	}
+
+	err = s.RemoveColumnFromLogs(mapping.FieldName)
+	if err != nil {
+		fmt.Printf("Failed to remove column for mapping %s: %v\n", mapping.FieldName, err)
+		// Proceed with deleting the mapping even if column removal fails
+	}
+
+	err = s.postgres.DeleteMappingFromDB(mappingID)
+	if err != nil {
+		return fmt.Errorf("failed to delete mapping from DB: %w", err)
+	}
+	return nil
+}
+
+func (s *Storage) DeleteAllMappings() error {
+	return s.postgres.DeleteAllMappingsFromDB()
 }
 
 /*
@@ -268,4 +430,8 @@ func (s *Storage) DeleteMappings() error {
 
 func (s *Storage) GetMappingTypes() ([]model.MappingType, error) {
 	return s.postgres.GetMappingTypesFromDB()
+}
+
+func (s *Storage) GetMappingTypesByID(typeID model.ID) (model.MappingType, error) {
+	return s.postgres.GetMappingTypeByIDFromDB(typeID)
 }

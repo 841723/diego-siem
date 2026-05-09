@@ -32,10 +32,16 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function normalizeProcessorDefinition(raw: unknown): ProcessorDefinition {
     const item = asRecord(raw);
+    const humanDescription =
+        item.humanDescription ??
+        item.humandescription ??
+        item.description ??
+        "";
     return {
         id: String(item.id ?? ""),
         name: String(item.name ?? ""),
         description: String(item.description ?? ""),
+        humanDescription: String(humanDescription),
         schema: asRecord(item.schema ?? item.config),
     };
 }
@@ -152,6 +158,19 @@ export async function getLogs(
             timeWindow,
             from,
             size,
+            query: {},
+            aggs: [
+                // {
+                //     name: "total",
+                //     type: "count",
+                //     field: "timestamp",
+                // },
+                {
+                    name: "mean_numseq",
+                    type: "avg",
+                    field: "numseq",
+                }
+            ],
         }),
     });
     const { logs, total } = payload as { logs: unknown[]; total: number };
@@ -231,8 +250,8 @@ export async function getPipelineProcessors(
 export async function updatePipelineProcessor(
     pipelineId: string,
     processors: Array<Pick<PipelineProcessor, "id" | "processorid" | "config">>,
-): Promise<PipelineProcessor> {
-    const payload = await request<unknown>(
+): Promise<void> {
+    await request<unknown>(
         `/pipelines/${pipelineId}/processors`,
         {
             method: "PUT",
@@ -240,7 +259,6 @@ export async function updatePipelineProcessor(
             body: JSON.stringify(processors),
         },
     );
-    return normalizePipelineProcessor(payload);
 }
 
 export async function deletePipelineProcessor(

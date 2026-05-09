@@ -1,23 +1,30 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import ConfirmModal from "../components/ConfirmModal";
 import LoadingState from "../components/LoadingState";
 import { useProcessors } from "../hooks/useProcessors";
+import { useSources } from "../hooks/useSources";
 import {
     createPipeline,
-    deletePipelineProcessor,
+    deletePipeline,
     getPipelineFull,
-    getPipelineProcessors,
     updatePipeline,
     updatePipelineProcessor,
 } from "../services/api";
-import type {
-    Pipeline,
-    PipelineProcessorDraft,
-    ProcessorDefinition,
-} from "../types";
+import type { ProcessorDefinition } from "../types";
 
-type PipelineFormPrefill = Partial<Pick<Pipeline, "name" | "description">> & {
-    fromPipelineId?: string;
+type DraftProcessor = {
+    localId: string;
+    id?: string;
+    processorid: string;
+    humanDescription: string;
+    config: Record<string, unknown>;
+};
+
+type PipelineDraftState = {
+    name: string;
+    description: string;
+    processors: DraftProcessor[];
 };
 
 function isBooleanType(value: unknown): boolean {
@@ -34,448 +41,388 @@ function isArrayType(value: unknown): boolean {
 }
 
 function emptyConfigFor(def: ProcessorDefinition): Record<string, unknown> {
-    const cfg: Record<string, unknown> = {};
+    const config: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(def.schema)) {
-        if (isArrayType(value)) {
-            cfg[key] = [];
-            continue;
-        }
-        if (isBooleanType(value)) {
-            cfg[key] = false;
-            continue;
-        }
-        if (isNumericType(value)) {
-            cfg[key] = 0;
-            continue;
-        }
-        cfg[key] = "";
+        if (isArrayType(value)) config[key] = [];
+        else if (isBooleanType(value)) config[key] = false;
+        else if (isNumericType(value)) config[key] = 0;
+        else config[key] = "";
     }
-    return cfg;
+    return config;
 }
 
-type ProcessorRowProps = {
-    index: number;
-    draft: PipelineProcessorDraft;
-    definitions: ProcessorDefinition[];
-    canRemove: boolean;
-    canMoveUp: boolean;
-    canMoveDown: boolean;
-    onTypeChange: (processorId: string) => void;
-    onConfigChange: (config: Record<string, unknown>) => void;
-    onMoveUp: () => void;
-    onMoveDown: () => void;
-    onRemove: () => void;
-};
-
-function ProcessorRow({
-    index,
-    draft,
-    definitions,
-    canRemove,
-    canMoveUp,
-    canMoveDown,
-    onTypeChange,
-    onConfigChange,
-    onMoveUp,
-    onMoveDown,
-    onRemove,
-}: ProcessorRowProps) {
-    const def =
-        definitions.find((candidate) => candidate.id === draft.processorId) ??
-        definitions[0];
-    const schemaEntries = def ? Object.entries(def.schema) : [];
-
-    function handleTypeChange(newType: string) {
-        const nextDef = definitions.find(
-            (candidate) => candidate.id === newType,
-        );
-        onConfigChange(nextDef ? emptyConfigFor(nextDef) : {});
-        onTypeChange(newType);
-    }
-
-    function updateField(key: string, value: unknown) {
-        onConfigChange({ ...draft.config, [key]: value });
-    }
-
-    return (
-        <div className='rounded border border-border bg-surface/80 p-3'>
-            <div className='flex items-end gap-2'>
-                <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-xs text-muted'>
-                    {index + 1}
-                </span>
-
-                <div className='flex-1 space-y-1'>
-                    <label className='block text-xs text-muted'>
-                        Tipo de procesador
-                    </label>
-                    <select
-                        className='w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent'
-                        value={draft.processorId}
-                        onChange={(event) =>
-                            handleTypeChange(event.target.value)
-                        }
-                    >
-                        {definitions.map((item) => (
-                            <option key={item.id} value={item.id}>
-                                {item.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                <div className='mb-0.5 flex gap-1'>
-                    <button
-                        type='button'
-                        onClick={onMoveUp}
-                        disabled={!canMoveUp}
-                        className='rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30 disabled:opacity-40'
-                        title='Mover arriba'
-                    >
-                        ↑
-                    </button>
-                    <button
-                        type='button'
-                        onClick={onMoveDown}
-                        disabled={!canMoveDown}
-                        className='rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30 disabled:opacity-40'
-                        title='Mover abajo'
-                    >
-                        ↓
-                    </button>
-                    <button
-                        type='button'
-                        onClick={onRemove}
-                        disabled={!canRemove}
-                        className='rounded border border-error/50 px-2 py-0.5 text-xs text-error hover:bg-error/10 disabled:opacity-40'
-                        title='Eliminar procesador'
-                    >
-                        ✕
-                    </button>
-                </div>
-            </div>
-
-            {def?.description && (
-                <p className='mt-2 pl-7 text-xs text-muted/80'>
-                    {def.description}
-                </p>
-            )}
-
-            {schemaEntries.length > 0 && (
-                <div className='mt-3 grid grid-cols-1 gap-2 pl-7 sm:grid-cols-2'>
-                    {schemaEntries.map(([key, schemaType]) => {
-                        const currentValue = draft.config[key];
-                        if (isBooleanType(schemaType)) {
-                            return (
-                                <label
-                                    key={key}
-                                    className='flex items-center gap-2 rounded border border-border px-2 py-1 text-xs text-text'
-                                >
-                                    <input
-                                        type='checkbox'
-                                        className='h-4 w-4 accent-accent'
-                                        checked={Boolean(currentValue ?? false)}
-                                        onChange={(event) =>
-                                            updateField(
-                                                key,
-                                                event.target.checked,
-                                            )
-                                        }
-                                    />
-                                    {key}
-                                </label>
-                            );
-                        }
-
-                        if (isArrayType(schemaType)) {
-                            return (
-                                <div key={key} className='space-y-0.5'>
-                                    <label className='block text-xs text-muted'>
-                                        {key}
-                                    </label>
-                                    <input
-                                        type='text'
-                                        className='w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent'
-                                        value={
-                                            Array.isArray(currentValue)
-                                                ? currentValue.join(", ")
-                                                : ""
-                                        }
-                                        onChange={(event) =>
-                                            updateField(
-                                                key,
-                                                event.target.value
-                                                    .split(",")
-                                                    .map((item) => item.trim())
-                                                    .filter(Boolean),
-                                            )
-                                        }
-                                        placeholder='valor1, valor2'
-                                    />
-                                </div>
-                            );
-                        }
-
-                        return (
-                            <div key={key} className='space-y-0.5'>
-                                <label className='block text-xs text-muted'>
-                                    {key}
-                                </label>
-                                <input
-                                    type={
-                                        isNumericType(schemaType)
-                                            ? "number"
-                                            : "text"
-                                    }
-                                    className='w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-accent'
-                                    value={
-                                        isNumericType(schemaType)
-                                            ? String(currentValue ?? 0)
-                                            : String(currentValue ?? "")
-                                    }
-                                    onChange={(event) =>
-                                        updateField(
-                                            key,
-                                            isNumericType(schemaType)
-                                                ? Number(event.target.value)
-                                                : event.target.value,
-                                        )
-                                    }
-                                />
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
-    );
+function resolveDefinition(
+    definitions: ProcessorDefinition[],
+    processorId: string,
+): ProcessorDefinition | null {
+    return definitions.find((item) => item.id === processorId) ?? definitions[0] ?? null;
 }
 
 export default function PipelineFormPage() {
     const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
-    const location = useLocation();
     const isEdit = Boolean(id);
-    const prefill = (location.state as PipelineFormPrefill | null) ?? null;
+    const navigate = useNavigate();
+    const { processors: processorDefs, loading: loadingDefs } = useProcessors();
+    const { sources } = useSources();
 
-    const {
-        processors: processorDefs,
-        loading: defsLoading,
-        error: defsError,
-    } = useProcessors();
-
-    const [name, setName] = useState(prefill?.name ?? "");
-    const [description, setDescription] = useState(prefill?.description ?? "");
-    const [drafts, setDrafts] = useState<PipelineProcessorDraft[]>([]);
-    const [loadingItem, setLoadingItem] = useState(
-        isEdit || Boolean(prefill?.fromPipelineId),
-    );
+    const [draft, setDraft] = useState<PipelineDraftState>({
+        name: "",
+        description: "",
+        processors: [],
+    });
+    const [loading, setLoading] = useState(isEdit);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
+    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+    const [dragIndex, setDragIndex] = useState<number | null>(null);
+    const [dropIndex, setDropIndex] = useState<number | null>(null);
 
-    const defaultDraft = useMemo<PipelineProcessorDraft | null>(() => {
-        if (processorDefs.length === 0) return null;
-        return {
-            clientId: crypto.randomUUID(),
-            processorId: processorDefs[0].id,
-            config: emptyConfigFor(processorDefs[0]),
-        };
-    }, [processorDefs]);
+    const [modalIndex, setModalIndex] = useState<number | null>(null);
+    const [modalDraft, setModalDraft] = useState<DraftProcessor | null>(null);
+
+    const sourceCountUsingPipeline = useMemo(() => {
+        if (!id) return 0;
+        return sources.filter((source) => source.pipelineid === id).length;
+    }, [id, sources]);
 
     useEffect(() => {
-        if (!isEdit || !id) return;
         let cancelled = false;
+        async function loadPipeline() {
+            if (!isEdit || !id) {
+                setDraft({ name: "", description: "", processors: [] });
+                setLoading(false);
+                return;
+            }
 
-        setLoadingItem(true);
-        getPipelineFull(id)
-            .then((full) => {
+            setLoading(true);
+            setError("");
+            try {
+                const full = await getPipelineFull(id);
                 if (cancelled) return;
-                setName(full.pipeline.name);
-                setDescription(full.pipeline.description ?? "");
-                setDrafts(
-                    full.processors.map((item, index) => ({
-                        clientId: item.id || `existing-${index}`,
-                        processorId: item.processorid,
-                        config: item.config,
+                const ordered = [...full.processors].sort((a, b) => a.order - b.order);
+                setDraft({
+                    name: full.pipeline.name,
+                    description: full.pipeline.description,
+                    processors: ordered.map((processor) => ({
+                        localId: crypto.randomUUID(),
+                        id: processor.id,
+                        processorid: processor.processorid,
+                        humanDescription:
+                            (typeof processor.config.humanDescription === "string"
+                                ? processor.config.humanDescription
+                                : undefined) ??
+                            processor.processor?.humanDescription ??
+                            processor.processor?.description ??
+                            "",
+                        config: processor.config,
                     })),
-                );
-            })
-            .catch((err: Error) => {
+                });
+            } catch (err) {
                 if (!cancelled) {
-                    setError(err.message || "Error cargando pipeline");
+                    setError((err as Error).message || "Error cargando pipeline");
                 }
-            })
-            .finally(() => {
-                if (!cancelled) setLoadingItem(false);
-            });
-
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+        void loadPipeline();
         return () => {
             cancelled = true;
         };
     }, [id, isEdit]);
 
-    useEffect(() => {
-        if (isEdit || !prefill?.fromPipelineId) return;
-        let cancelled = false;
-        setLoadingItem(true);
-        getPipelineFull(prefill.fromPipelineId)
-            .then((full) => {
-                if (cancelled) return;
-                setDrafts(
-                    full.processors.map((item, index) => ({
-                        clientId: item.id || `copied-${index}`,
-                        processorId: item.processorid,
-                        config: item.config,
-                    })),
-                );
-            })
-            .catch((err: Error) => {
-                if (!cancelled) {
-                    setError(err.message || "Error cargando pipeline origen");
-                }
-            })
-            .finally(() => {
-                if (!cancelled) setLoadingItem(false);
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [isEdit, prefill?.fromPipelineId]);
-
-    useEffect(() => {
-        if (defsLoading || loadingItem || drafts.length > 0 || !defaultDraft)
-            return;
-        setDrafts([defaultDraft]);
-    }, [defaultDraft, defsLoading, drafts.length, loadingItem]);
-
-    function addProcessor() {
-        if (!defaultDraft) return;
-        setDrafts((prev) => [
-            ...prev,
-            {
-                ...defaultDraft,
-                clientId: crypto.randomUUID(),
-                config: { ...defaultDraft.config },
-            },
-        ]);
-    }
-
-    function removeProcessor(index: number) {
-        setDrafts((prev) => prev.filter((_, current) => current !== index));
-    }
-
-    function moveProcessor(index: number, direction: -1 | 1) {
-        setDrafts((prev) => {
-            const nextIndex = index + direction;
-            if (nextIndex < 0 || nextIndex >= prev.length) return prev;
-            const copy = [...prev];
-            const [item] = copy.splice(index, 1);
-            copy.splice(nextIndex, 0, item);
-            return copy;
+    function reorderProcessors(from: number, to: number) {
+        setDraft((prev) => {
+            const next = [...prev.processors];
+            if (from < 0 || to < 0 || from >= next.length || to >= next.length) {
+                return prev;
+            }
+            const [moved] = next.splice(from, 1);
+            next.splice(to, 0, moved);
+            return { ...prev, processors: next };
         });
     }
 
-    function updateType(index: number, processorId: string) {
-        setDrafts((prev) =>
-            prev.map((item, current) =>
-                current === index ? { ...item, processorId } : item,
-            ),
-        );
+    function onDrop(targetIndex: number) {
+        if (dragIndex === null) return;
+        reorderProcessors(dragIndex, targetIndex);
+        setDragIndex(null);
+        setDropIndex(null);
     }
 
-    function updateConfig(index: number, config: Record<string, unknown>) {
-        setDrafts((prev) =>
-            prev.map((item, current) =>
-                current === index ? { ...item, config } : item,
-            ),
-        );
+    function openProcessorModal(index: number) {
+        const processor = draft.processors[index];
+        if (!processor) return;
+        setModalIndex(index);
+        setModalDraft({
+            ...processor,
+            config: { ...processor.config },
+        });
     }
 
-    async function syncPipelineProcessors(pipelineId: string) {
-        const existing = await getPipelineProcessors(pipelineId);
-        const sharedCount = Math.min(existing.length, drafts.length);
+    function applyModalChangesAndClose() {
+        if (modalIndex === null || !modalDraft) {
+            setModalIndex(null);
+            setModalDraft(null);
+            return;
+        }
+        setDraft((prev) => ({
+            ...prev,
+            processors: prev.processors.map((processor, index) =>
+                index === modalIndex ? modalDraft : processor,
+            ),
+        }));
+        setModalIndex(null);
+        setModalDraft(null);
+    }
 
-        // send a single put request with the full list of processors, including their IDs, to update them all at once
+    function closeModalDiscardingChanges() {
+        setModalIndex(null);
+        setModalDraft(null);
+    }
+
+    function addProcessor() {
+        if (loadingDefs || processorDefs.length === 0) return;
+        const processorDef = processorDefs[0];
+        const newProcessor: DraftProcessor = {
+            localId: crypto.randomUUID(),
+            processorid: processorDef.id,
+            humanDescription:
+                processorDef.humanDescription || processorDef.description || "",
+            config: emptyConfigFor(processorDef),
+        };
+        setDraft((prev) => ({
+            ...prev,
+            processors: [...prev.processors, newProcessor],
+        }));
+        setModalIndex(draft.processors.length);
+        setModalDraft(newProcessor);
+    }
+
+    async function persistPipeline(nextId?: string) {
+        const pipelineId = nextId ?? id ?? crypto.randomUUID();
+        if (id) {
+            await updatePipeline(id, {
+                name: draft.name,
+                description: draft.description,
+            });
+        } else {
+            await createPipeline({
+                id: pipelineId,
+                name: draft.name,
+                description: draft.description,
+            });
+        }
+
         await updatePipelineProcessor(
             pipelineId,
-            drafts.map((draft, index) => ({
-                id: existing[index]?.id ?? crypto.randomUUID(),
-                processorid: draft.processorId,
-                config: draft.config,
+            draft.processors.map((processor) => ({
+                id: processor.id ?? crypto.randomUUID(),
+                processorid: processor.processorid,
+                config: {
+                    ...processor.config,
+                    humanDescription: processor.humanDescription,
+                },
             })),
         );
 
-        // for (let index = sharedCount; index < drafts.length; index += 1) {
-        //     const draft = drafts[index];
-        //     await createPipelineProcessor(pipelineId, {
-        //         id: crypto.randomUUID(),
-        //         processorid: draft.processorId,
-        //         config: draft.config,
-        //     });
-        // }
-
-        for (let index = sharedCount; index < existing.length; index += 1) {
-            await deletePipelineProcessor(pipelineId, existing[index].id);
-        }
+        return pipelineId;
     }
 
-    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    async function handleSavePipeline(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        setError("");
         setSubmitting(true);
-
+        setError("");
         try {
-            const pipelineId = isEdit && id ? id : crypto.randomUUID();
-            if (isEdit && id) {
-                await updatePipeline(id, { name, description });
-            } else {
-                await createPipeline({ id: pipelineId, name, description });
-            }
-            await syncPipelineProcessors(pipelineId);
-            navigate("/pipelines");
+            const pipelineId = await persistPipeline();
+            navigate(`/pipelines/${pipelineId}/edit`);
         } catch (err) {
-            setError((err as Error).message || "Error al guardar pipeline");
+            setError((err as Error).message || "Error guardando pipeline");
         } finally {
             setSubmitting(false);
         }
     }
 
-    if (loadingItem) return <LoadingState message='Cargando pipeline…' />;
+    async function handleDuplicatePipeline() {
+        setSubmitting(true);
+        setError("");
+        try {
+            const newPipelineId = crypto.randomUUID();
+            await createPipeline({
+                id: newPipelineId,
+                name: `${draft.name} (copia)`,
+                description: draft.description,
+            });
+            await updatePipelineProcessor(
+                newPipelineId,
+                draft.processors.map((processor) => ({
+                    id: crypto.randomUUID(),
+                    processorid: processor.processorid,
+                    config: {
+                        ...processor.config,
+                        humanDescription: processor.humanDescription,
+                    },
+                })),
+            );
+            navigate(`/pipelines/${newPipelineId}/edit`);
+        } catch (err) {
+            setError((err as Error).message || "Error duplicando pipeline");
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    async function handleDeletePipeline() {
+        if (!id) return;
+        if (sourceCountUsingPipeline > 0) {
+            setError(
+                `Cannot delete pipeline because it is being used by ${sourceCountUsingPipeline} sources`,
+            );
+            setConfirmDeleteOpen(false);
+            return;
+        }
+
+        setSubmitting(true);
+        setError("");
+        try {
+            await deletePipeline(id);
+            navigate("/pipelines");
+        } catch (err) {
+            setError((err as Error).message || "Error eliminando pipeline");
+            setSubmitting(false);
+            setConfirmDeleteOpen(false);
+        }
+    }
+
+    function renderConfigField(
+        key: string,
+        schemaType: unknown,
+        value: unknown,
+        onChange: (next: unknown) => void,
+    ) {
+        if (isBooleanType(schemaType)) {
+            return (
+                <label
+                    key={key}
+                    className='flex items-center gap-2 rounded border border-border px-3 py-2 text-sm text-text'
+                >
+                    <input
+                        type='checkbox'
+                        className='h-4 w-4 accent-accent'
+                        checked={Boolean(value)}
+                        onChange={(event) => onChange(event.target.checked)}
+                    />
+                    {key}
+                </label>
+            );
+        }
+
+        if (isArrayType(schemaType)) {
+            return (
+                <div key={key} className='space-y-1'>
+                    <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                        {key}
+                    </label>
+                    <input
+                        className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                        value={Array.isArray(value) ? value.join(", ") : ""}
+                        onChange={(event) =>
+                            onChange(
+                                event.target.value
+                                    .split(",")
+                                    .map((item) => item.trim())
+                                    .filter(Boolean),
+                            )
+                        }
+                    />
+                </div>
+            );
+        }
+
+        return (
+            <div key={key} className='space-y-1'>
+                <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                    {key}
+                </label>
+                <input
+                    type={isNumericType(schemaType) ? "number" : "text"}
+                    className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                    value={
+                        isNumericType(schemaType)
+                            ? String(value ?? 0)
+                            : String(value ?? "")
+                    }
+                    onChange={(event) =>
+                        onChange(
+                            isNumericType(schemaType)
+                                ? Number(event.target.value)
+                                : event.target.value,
+                        )
+                    }
+                />
+            </div>
+        );
+    }
+
+    const modalProcessorDef = modalDraft
+        ? resolveDefinition(processorDefs, modalDraft.processorid)
+        : null;
+
+    if (loading) return <LoadingState message='Cargando pipeline…' />;
 
     return (
         <main className='flex h-full flex-col overflow-hidden'>
             <div className='shrink-0 border-b border-border bg-background px-6 py-4'>
-                <div className='flex items-center gap-4'>
-                    <button
-                        onClick={() => navigate("/pipelines")}
-                        className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
-                    >
-                        ← Volver
-                    </button>
-                    <h1 className='text-xl font-semibold text-text-logo'>
-                        {isEdit
-                            ? "Editar pipeline"
-                            : prefill
-                              ? "Duplicar pipeline"
-                              : "Nuevo pipeline"}
-                    </h1>
+                <div className='flex items-center justify-between gap-4'>
+                    <div className='flex items-center gap-4'>
+                        <button
+                            onClick={() => navigate("/pipelines")}
+                            className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
+                        >
+                            ← Volver
+                        </button>
+                        <h1 className='text-xl font-semibold text-text-logo'>
+                            {isEdit ? "Editar pipeline" : "Nuevo pipeline"}
+                        </h1>
+                    </div>
+                    {isEdit && (
+                        <div className='flex gap-2'>
+                            <button
+                                type='button'
+                                onClick={handleDuplicatePipeline}
+                                disabled={submitting}
+                                className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30 disabled:opacity-50'
+                            >
+                                Duplicar
+                            </button>
+                            <button
+                                type='button'
+                                onClick={() => setConfirmDeleteOpen(true)}
+                                className='rounded border border-error/50 px-3 py-1.5 text-sm text-error hover:bg-error/10'
+                            >
+                                Eliminar
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
             <div className='flex-1 overflow-y-auto p-6'>
-                <div className='mx-auto max-w-3xl'>
-                    <form onSubmit={handleSubmit} className='space-y-5'>
+                <div className='mx-auto max-w-4xl'>
+                    <form onSubmit={handleSavePipeline} className='space-y-5'>
                         <div className='space-y-1'>
                             <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
                                 Nombre
                             </label>
                             <input
                                 className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
-                                value={name}
+                                value={draft.name}
                                 onChange={(event) =>
-                                    setName(event.target.value)
+                                    setDraft((prev) => ({
+                                        ...prev,
+                                        name: event.target.value,
+                                    }))
                                 }
-                                placeholder='ej. syslog-normalize'
                                 required
                             />
                         </div>
@@ -485,100 +432,109 @@ export default function PipelineFormPage() {
                                 Descripción
                             </label>
                             <textarea
-                                className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
                                 rows={2}
-                                value={description}
+                                className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                                value={draft.description}
                                 onChange={(event) =>
-                                    setDescription(event.target.value)
+                                    setDraft((prev) => ({
+                                        ...prev,
+                                        description: event.target.value,
+                                    }))
                                 }
-                                placeholder='Describe qué hace este pipeline…'
                             />
                         </div>
 
-                        <div className='space-y-2'>
+                        <div className='space-y-3'>
                             <div className='flex items-center justify-between'>
-                                <span className='block text-xs font-semibold uppercase tracking-wider text-muted'>
-                                    Procesadores (flujo)
+                                <span className='text-xs font-semibold uppercase tracking-wider text-muted'>
+                                    Processors
                                 </span>
                                 <button
                                     type='button'
                                     onClick={addProcessor}
-                                    disabled={
-                                        defsLoading ||
-                                        processorDefs.length === 0
-                                    }
-                                    className='rounded border border-border px-2 py-0.5 text-xs text-muted hover:bg-primary/30 disabled:opacity-40'
+                                    className='rounded border border-border px-2 py-1 text-xs text-muted hover:bg-primary/30'
                                 >
-                                    + Añadir procesador
+                                    + Añadir processor
                                 </button>
                             </div>
 
-                            {(defsError || error) && (
-                                <p className='rounded bg-error/20 px-3 py-2 text-sm text-error'>
-                                    {defsError || error}
-                                </p>
-                            )}
-
-                            {defsLoading ? (
-                                <p className='text-xs text-muted'>
-                                    Cargando tipos de procesadores…
-                                </p>
-                            ) : (
-                                <div className='space-y-2'>
-                                    {drafts.map((draft, index) => (
-                                        <div key={draft.clientId}>
-                                            <ProcessorRow
-                                                index={index}
-                                                draft={draft}
-                                                definitions={processorDefs}
-                                                canRemove={drafts.length > 1}
-                                                canMoveUp={index > 0}
-                                                canMoveDown={
-                                                    index < drafts.length - 1
-                                                }
-                                                onTypeChange={(value) =>
-                                                    updateType(index, value)
-                                                }
-                                                onConfigChange={(value) =>
-                                                    updateConfig(index, value)
-                                                }
-                                                onMoveUp={() =>
-                                                    moveProcessor(index, -1)
-                                                }
-                                                onMoveDown={() =>
-                                                    moveProcessor(index, 1)
-                                                }
-                                                onRemove={() =>
-                                                    removeProcessor(index)
-                                                }
-                                            />
-                                            {index < drafts.length - 1 && (
-                                                <div className='px-2 py-1 text-center text-xs text-muted/70'>
-                                                    ↓
-                                                </div>
+                            <div className='space-y-2'>
+                                {draft.processors.map((processor, index) => {
+                                    const definition = resolveDefinition(
+                                        processorDefs,
+                                        processor.processorid,
+                                    );
+                                    const isDropTarget = dropIndex === index;
+                                    return (
+                                        <div key={processor.localId} className='space-y-1'>
+                                            {isDropTarget && (
+                                                <div className='h-1 rounded bg-accent/80 transition-all' />
                                             )}
+                                            <div
+                                                draggable
+                                                onDragStart={() => setDragIndex(index)}
+                                                onDragOver={(event) => {
+                                                    event.preventDefault();
+                                                    setDropIndex(index);
+                                                }}
+                                                onDragEnd={() => {
+                                                    setDragIndex(null);
+                                                    setDropIndex(null);
+                                                }}
+                                                onDrop={(event) => {
+                                                    event.preventDefault();
+                                                    onDrop(index);
+                                                }}
+                                                onClick={() => openProcessorModal(index)}
+                                                className={`rounded border border-border bg-surface/70 p-3 transition-all cursor-pointer hover:bg-surface ${
+                                                    dragIndex === index
+                                                        ? "opacity-60 scale-[0.99]"
+                                                        : ""
+                                                }`}
+                                            >
+                                                <div className='flex items-center gap-2'>
+                                                    <span className='flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs text-muted'>
+                                                        {index + 1}
+                                                    </span>
+                                                    <div>
+                                                        <p className='text-sm font-semibold text-text'>
+                                                            {definition?.name ??
+                                                                processor.processorid}
+                                                        </p>
+                                                        <p className='text-xs text-muted'>
+                                                            {processor.humanDescription ||
+                                                                definition?.humanDescription ||
+                                                                definition?.description ||
+                                                                "Sin descripción"}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
+                                    );
+                                })}
+
+                                {draft.processors.length === 0 && (
+                                    <p className='rounded border border-border bg-surface/60 px-3 py-4 text-sm text-muted'>
+                                        Añade al menos un processor.
+                                    </p>
+                                )}
+                            </div>
                         </div>
+
+                        {error && (
+                            <p className='rounded bg-error/20 px-3 py-2 text-sm text-error'>
+                                {error}
+                            </p>
+                        )}
 
                         <div className='flex gap-3 pt-2'>
                             <button
                                 type='submit'
-                                disabled={
-                                    submitting ||
-                                    defsLoading ||
-                                    processorDefs.length === 0 ||
-                                    drafts.length === 0
-                                }
+                                disabled={submitting || draft.processors.length === 0}
                                 className='rounded bg-accent px-5 py-2 text-sm font-semibold text-white hover:bg-accent/80 disabled:opacity-50'
                             >
-                                {submitting
-                                    ? "Guardando…"
-                                    : isEdit
-                                      ? "Guardar cambios"
-                                      : "Crear pipeline"}
+                                {submitting ? "Guardando…" : "Guardar cambios"}
                             </button>
                             <button
                                 type='button'
@@ -591,6 +547,172 @@ export default function PipelineFormPage() {
                     </form>
                 </div>
             </div>
+
+            {modalDraft && modalProcessorDef && (
+                <div className='fixed inset-0 z-50'>
+                    <div
+                        className='absolute inset-0 bg-black/40'
+                        onClick={applyModalChangesAndClose}
+                        aria-hidden='true'
+                    />
+                    <aside className='absolute right-0 top-0 h-full w-full max-w-xl border-l border-border bg-background shadow-2xl'>
+                        <div className='flex h-full flex-col'>
+                            <div className='flex items-center justify-between border-b border-border px-6 py-4'>
+                                <div>
+                                    <h2 className='text-lg font-semibold text-text-logo'>
+                                        {modalProcessorDef.name}
+                                    </h2>
+                                    <p className='text-xs text-muted'>
+                                        {modalDraft.humanDescription ||
+                                            modalProcessorDef.humanDescription ||
+                                            modalProcessorDef.description}
+                                    </p>
+                                </div>
+                                <button
+                                    type='button'
+                                    onClick={applyModalChangesAndClose}
+                                    className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+
+                            <div className='flex-1 overflow-y-auto p-6 space-y-4'>
+                                <div className='space-y-1'>
+                                    <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                                        Tipo de processor
+                                    </label>
+                                    <select
+                                        className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                                        value={modalDraft.processorid}
+                                        onChange={(event) => {
+                                            const nextDef = resolveDefinition(
+                                                processorDefs,
+                                                event.target.value,
+                                            );
+                                            if (!nextDef) return;
+                                            setModalDraft((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          processorid:
+                                                              event.target.value,
+                                                          humanDescription:
+                                                              nextDef.humanDescription ||
+                                                              nextDef.description ||
+                                                              "",
+                                                          config: emptyConfigFor(
+                                                              nextDef,
+                                                          ),
+                                                      }
+                                                    : prev,
+                                            );
+                                        }}
+                                    >
+                                        {processorDefs.map((processor) => (
+                                            <option key={processor.id} value={processor.id}>
+                                                {processor.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className='space-y-1'>
+                                    <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                                        HumanDescription
+                                    </label>
+                                    <textarea
+                                        rows={3}
+                                        className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                                        value={modalDraft.humanDescription}
+                                        onChange={(event) =>
+                                            setModalDraft((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          humanDescription:
+                                                              event.target.value,
+                                                      }
+                                                    : prev,
+                                            )
+                                        }
+                                    />
+                                </div>
+
+                                <div className='grid grid-cols-1 gap-3'>
+                                    {Object.entries(modalProcessorDef.schema).map(
+                                        ([key, schemaType]) =>
+                                            renderConfigField(
+                                                key,
+                                                schemaType,
+                                                modalDraft.config[key],
+                                                (nextValue) =>
+                                                    setModalDraft((prev) =>
+                                                        prev
+                                                            ? {
+                                                                  ...prev,
+                                                                  config: {
+                                                                      ...prev.config,
+                                                                      [key]: nextValue,
+                                                                  },
+                                                              }
+                                                            : prev,
+                                                    ),
+                                            ),
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className='flex items-center justify-between border-t border-border px-6 py-4'>
+                                <button
+                                    type='button'
+                                    onClick={() => {
+                                        if (modalIndex === null) return;
+                                        setDraft((prev) => ({
+                                            ...prev,
+                                            processors: prev.processors.filter(
+                                                (_, index) => index !== modalIndex,
+                                            ),
+                                        }));
+                                        closeModalDiscardingChanges();
+                                    }}
+                                    className='rounded border border-error/50 px-4 py-2 text-sm text-error hover:bg-error/10'
+                                >
+                                    Eliminar processor
+                                </button>
+                                <div className='flex gap-3'>
+                                    <button
+                                        type='button'
+                                        onClick={closeModalDiscardingChanges}
+                                        className='rounded border border-border px-4 py-2 text-sm text-muted hover:bg-primary/30'
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type='button'
+                                        onClick={applyModalChangesAndClose}
+                                        className='rounded bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/80'
+                                    >
+                                        Guardar cambios
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            )}
+
+            <ConfirmModal
+                open={confirmDeleteOpen}
+                title='Eliminar pipeline'
+                message={
+                    sourceCountUsingPipeline > 0
+                        ? `Cannot delete pipeline because it is being used by ${sourceCountUsingPipeline} sources`
+                        : "¿Seguro que quieres eliminar este pipeline?"
+                }
+                onConfirm={handleDeletePipeline}
+                onCancel={() => setConfirmDeleteOpen(false)}
+            />
         </main>
     );
 }

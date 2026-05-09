@@ -2,6 +2,7 @@ package processors
 
 import (
 	"encoding/json"
+	"errors"
 
 	"backend/internal/model"
 )
@@ -18,8 +19,16 @@ type CallPipeline struct {
 }
 
 func (p *CallPipeline) Process(logData model.LogData) error {
-	// Implementa la lógica de procesamiento aquí
-	return nil
+	// La logica de llamada a otra pipeline se resuelve en el storage:
+	// storage.GetProcessorsByPipelineID() devuelve los procesadores completos
+	//  de la pipeline hasta X niveles de profundidad. Se sustituye el
+	//  procesador "Call Pipeline" por los procesadores de la pipeline llamada.
+
+	// Si ha llegado un "Call Pipeline" sin que se haya resuelto (porque se ha
+	//  llegado al maxDepth), se devuelve un error para evitar procesar la log
+	//  con un "Call Pipeline" sin resolver.
+
+	return errors.New("Call Pipeline processor not resolved in storage layer")
 }
 
 func NewCallPipelineProcessor(config model.PipelineProcessorConfig) (*CallPipeline, error) {
@@ -31,6 +40,10 @@ func NewCallPipelineProcessor(config model.PipelineProcessorConfig) (*CallPipeli
 
 	cfg.ProcessorMeta = WithMeta("Call Pipeline", "Calls another pipeline and processes the results", "{\"pipeline_id\": \"uuid\"}")
 	return &cfg, nil
+}
+
+func GetCallPipelineProcessorName() string {
+	return "Call Pipeline"
 }
 
 func init() {

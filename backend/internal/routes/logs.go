@@ -5,6 +5,7 @@ import (
 
 	"backend/internal/lib"
 	"backend/internal/model"
+	"backend/internal/service"
 	"backend/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -12,10 +13,11 @@ import (
 
 type LogsHandler struct {
 	storage *storage.Storage
+	aggs    *service.AggsService
 }
 
-func NewLogsHandler(storage *storage.Storage) *LogsHandler {
-	return &LogsHandler{storage: storage}
+func NewLogsHandler(storage *storage.Storage, aggs *service.AggsService) *LogsHandler {
+	return &LogsHandler{storage: storage, aggs: aggs}
 }
 
 func (h *LogsHandler) GetLogs(c *gin.Context) {
@@ -26,7 +28,7 @@ func (h *LogsHandler) GetLogs(c *gin.Context) {
 		return
 	}
 
-	body := model.GetLogsParams{}
+	body := model.GetLogsRequest{}
 	if err := c.BindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
@@ -49,7 +51,20 @@ func (h *LogsHandler) GetLogs(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"logs": sources, "total": count})
+
+	aggs, err := h.aggs.GetAggs(body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	response := model.GetLogsResponse{
+		Logs:  sources,
+		Total: count,
+		Aggs:  aggs, // Placeholder for actual aggs
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *LogsHandler) DeleteLogs(c *gin.Context) {
@@ -61,8 +76,8 @@ func (h *LogsHandler) DeleteLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "All logs deleted"})
 }
 
-func LogRegisterRoutes(r *gin.Engine, storage *storage.Storage) {
-	handler := NewLogsHandler(storage)
+func LogRegisterRoutes(r *gin.Engine, storage *storage.Storage, aggs *service.AggsService) {
+	handler := NewLogsHandler(storage, aggs)
 	logsGroup := r.Group("/logs")
 
 	logsGroup.POST("/:id", handler.GetLogs)

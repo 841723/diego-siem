@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"time"
 
 	"backend/internal/model"
@@ -15,7 +14,8 @@ import (
 
 type App struct {
 	// Array with all sources in memory
-	sources  service.SourceManager
+	sources  service.SourceService
+	aggs	 service.AggsService
 	storages storage.Storage
 }
 
@@ -35,7 +35,7 @@ func (a *App) initAPI() {
 	}))
 
 	// 	/logs
-	routes.LogRegisterRoutes(r, &a.storages)
+	routes.LogRegisterRoutes(r, &a.storages, &a.aggs)
 
 	// 	/sources
 	routes.SourcesRegisterRoutes(r, &a.sources, &a.storages)
@@ -88,18 +88,14 @@ func New() *App {
 	storages := storage.NewStorage()
 	return &App{
 		storages: *storages,
-		sources:  *service.NewSourceManager(storages),
+		sources:  *service.NewSourceService(storages),
+		aggs:     *service.NewAggsService(storages),
 	}
 }
 
 func Run() {
 	app := New()
 
-	fmt.Println("Sources initialized")
-	go app.initSources()
-
-	fmt.Println("Waiting for logs from sources...")
-
-	fmt.Println("API initialized")
+	app.initSources()
 	app.initAPI()
 }

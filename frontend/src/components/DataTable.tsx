@@ -5,9 +5,15 @@ type Props = {
     headers: string[];
     rows: ReactNode[][];
     emptyMessage?: string;
+    onRowClick?: (index: number) => void;
 };
 
-export default function DataTable({ headers, rows, emptyMessage }: Props) {
+export default function DataTable({
+    headers,
+    rows,
+    emptyMessage,
+    onRowClick,
+}: Props) {
     if (rows.length === 0) {
         return <EmptyState message={emptyMessage} />;
     }
@@ -33,10 +39,15 @@ export default function DataTable({ headers, rows, emptyMessage }: Props) {
                 {rows.map((cells, idx) => (
                     <div
                         key={idx}
-                        className='grid odd:bg-primary/30 even:bg-primary/20 cursor-default'
+                        className={`grid odd:bg-primary/30 even:bg-primary/20 ${
+                            onRowClick
+                                ? "cursor-pointer hover:bg-accent/25 transition-colors"
+                                : "cursor-default"
+                        }`}
                         style={{
                             gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))`,
                         }}
+                        onClick={() => onRowClick?.(idx)}
                     >
                         {cells.map((cell, colIdx) => (
                             <div

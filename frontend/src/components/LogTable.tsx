@@ -7,11 +7,7 @@ type Props = {
     columns: string[];
 };
 
-const getCellValue = (
-    loading: boolean,
-    log: LogEntry,
-    col: string,
-): string => {
+const getCellValue = (loading: boolean, log: LogEntry, col: string): string => {
     if (loading) return " ";
     if (col === "timestamp") return formatTimestamp(log.timestamp);
     if (col === "sourceid") return String(log.sourceid);
@@ -19,12 +15,20 @@ const getCellValue = (
 };
 
 export default function LogTable({ loading = true, logs, columns }: Props) {
+    if (columns.length === 0) {
+        return (
+            <div className='rounded border border-border bg-surface/60 px-4 py-6 text-center text-sm text-muted'>
+                No hay columnas seleccionadas.
+            </div>
+        );
+    }
+
     // if (logs.length === 0) {
     //     return <EmptyState message="No hay logs para los criterios seleccionados" />;
     // }
 
     return (
-        <div className='flex-1 flex flex-col overflow-hidden'>
+        <div className='flex-1 flex flex-col overflow-hidden mb-4'>
             <div
                 className='grid bg-secondary text-white text-sm tracking-wider'
                 style={{
@@ -49,7 +53,7 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
                         {columns.map((col, idx) => (
                             <div
                                 key={col}
-                                className='group relative p-1 border-3 border-transparent text-xs wrap-break-word h-8 my-auto hover:border-primary hover:rounded-r hover:rounded-b'
+                                className='group relative p-1 border-3 border-transparent text-xs wrap-break-word my-auto hover:border-primary hover:rounded-r hover:rounded-b h-full'
                             >
                                 <span className='line-clamp-2 font-mono'>
                                     {getCellValue(loading, log, col)}
@@ -66,7 +70,7 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
                                                     ? "0 0.25rem 0.25rem 0"
                                                     : "0.25rem 0 0 0.25rem",
                                             transition:
-                                                "opacity 0.5s step-end 0s",
+                                                "opacity 0.5s ease 0s",
                                         }}
                                     >
                                         <button
@@ -155,5 +159,3 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
         </div>
     );
 }
-
-

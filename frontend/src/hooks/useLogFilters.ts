@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getLogs } from "../services/api";
 import type { LogEntry, TimeWindow } from "../types";
 
-export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
-export const DEFAULT_PAGE_SIZE = 25;
-export const DEFAULT_COLUMNS = ["timestamp", "sourceid"];
+export const FIXED_PAGE_SIZE = 100;
+export const MAX_LOG_PAGES = 5;
+export const PAGE_SIZE_OPTIONS = [FIXED_PAGE_SIZE] as const;
+export const DEFAULT_COLUMNS = ["timestamp", "sourceid", "numseq"];
 
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -74,6 +75,7 @@ export type LogFiltersState = {
 
 export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
     const [searchParams, setSearchParams] = useSearchParams();
+    const requestSeq = useRef(0);
 
     const parseSourceId = (): string | null => {
         const raw = searchParams.get("source");
@@ -95,17 +97,7 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
         1,
         parseInt(searchParams.get("page") ?? "1", 10) || 1,
     );
-    const pageSize = (() => {
-        const n = parseInt(
-            searchParams.get("pageSize") ?? String(DEFAULT_PAGE_SIZE),
-            10,
-        );
-        return PAGE_SIZE_OPTIONS.includes(
-            n as (typeof PAGE_SIZE_OPTIONS)[number],
-        )
-            ? n
-            : DEFAULT_PAGE_SIZE;
-    })();
+    const pageSize = FIXED_PAGE_SIZE;
     const columns = parseColumns();
 
     const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -125,50 +117,70 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
         });
     }
 
-    // Auto-select first source when list arrives
+    // Auto-select first source when list arrives or when selected source disappears
     useEffect(() => {
-        if (sourceId === null && availableSourceIds.length > 0) {
+        if (availableSourceIds.length === 0) return;
+        if (sourceId === null || !availableSourceIds.includes(sourceId)) {
             updateParams({ source: String(availableSourceIds[0]), page: "1" });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableSourceIds.join(",")]);
 
-    // Fetch logs when sourceId or tick changes
+    // Fetch logs when source / time / page changes
     useEffect(() => {
         if (sourceId === null) {
             setLogs([]);
+            setTotalLogs(0);
+            setLogsError("");
             return;
         }
-        let cancelled = false;
+        const requestId = requestSeq.current + 1;
+        requestSeq.current = requestId;
+
         setLogsLoading(true);
-        getLogs(sourceId, timeWindow, (page - 1) * pageSize, pageSize)
+        const safePage = Math.min(MAX_LOG_PAGES, Math.max(1, page));
+        const offset = (safePage - 1) * FIXED_PAGE_SIZE;
+        getLogs(sourceId, timeWindow, offset, FIXED_PAGE_SIZE)
             .then(({ logs, total }) => {
-                if (!cancelled) {
+                if (requestSeq.current === requestId) {
                     setLogs(logs);
                     setTotalLogs(total);
                     setLogsError("");
                 }
             })
             .catch((err: Error) => {
-                if (!cancelled) {
+                if (requestSeq.current === requestId) {
+                    setLogs([]);
+                    setTotalLogs(0);
                     setLogsError(err.message || "Error cargando logs");
                 }
             })
             .finally(() => {
-                if (!cancelled) setLogsLoading(false);
+                if (requestSeq.current === requestId) setLogsLoading(false);
             });
-        return () => {
-            cancelled = true;
-        };
-    }, [sourceId, fetchTick]);
+    }, [sourceId, timeWindow, page, fetchTick]);
 
     const availableColumns = useMemo(() => {
         const set = new Set<string>(DEFAULT_COLUMNS);
-        logs.forEach((log) =>
-            Object.keys(log.data ?? {}).forEach((f) => set.add(f)),
-        );
+        columns.forEach((column) => set.add(column));
+
+        logs.forEach((log) => {
+            if (log.data) {
+                const flatten = (obj: Record<string, unknown>, prefix = "") => {
+                    Object.entries(obj).forEach(([key, value]) => {
+                        const newKey = prefix ? `${prefix}.${key}` : key;
+                        set.add(newKey);
+                        if (typeof value === "object" && value !== null) {
+                            flatten(value as Record<string, unknown>, newKey);
+                        }
+                    });
+                };
+                flatten(log.data);
+            }
+        });
+
         return Array.from(set);
-    }, [logs]);
+    }, [logs, columns]);
 
     const filteredLogs = useMemo(() => {
         const now = Date.now();
@@ -201,13 +213,14 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
         });
     }, [logs, sourceId, timeWindow, filterText, columns]);
 
-    const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+    const totalPages = Math.max(
+        1,
+        Math.min(MAX_LOG_PAGES, Math.ceil(totalLogs / FIXED_PAGE_SIZE)),
+    );
 
     const paginatedLogs = useMemo(() => {
-        const safePage = Math.min(page, totalPages);
-        const start = (safePage - 1) * pageSize;
-        return filteredLogs.slice(start, start + pageSize);
-    }, [filteredLogs, page, pageSize, totalPages]);
+        return filteredLogs;
+    }, [filteredLogs]);
 
     const setSource = useCallback((id: string | null) => {
         updateParams({ source: id !== null ? String(id) : null, page: "1" });
@@ -229,21 +242,22 @@ export function useLogFilters(availableSourceIds: string[]): LogFiltersState {
             const next = columns.includes(col)
                 ? columns.filter((c) => c !== col)
                 : [...columns, col];
-            updateParams({ cols: next.join(","), page: "1" });
+            updateParams({
+                cols: next.length > 0 ? next.join(",") : "",
+                page: "1",
+            });
             // eslint-disable-next-line react-hooks/exhaustive-deps
         },
         [columns],
     );
 
     const setPage = useCallback((p: number) => {
-        updateParams({ page: String(p) });
+        const safePage = Math.min(MAX_LOG_PAGES, Math.max(1, p));
+        updateParams({ page: String(safePage) });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const setPageSize = useCallback((s: number) => {
-        updateParams({ pageSize: String(s), page: "1" });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    const setPageSize = useCallback((_s: number) => {}, []);
 
     const refetchLogs = useCallback(() => setFetchTick((n) => n + 1), []);
 

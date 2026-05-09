@@ -12,10 +12,10 @@ import (
 
 type PipelinesHandler struct {
 	storage *storage.Storage
-	sources *service.SourceManager
+	sources *service.SourceService
 }
 
-func NewPipelinesHandler(storage *storage.Storage, sources *service.SourceManager) *PipelinesHandler {
+func NewPipelinesHandler(storage *storage.Storage, sources *service.SourceService) *PipelinesHandler {
 	return &PipelinesHandler{storage: storage, sources: sources}
 }
 
@@ -80,7 +80,7 @@ func (h *PipelinesHandler) GetFullPipelineByID(c *gin.Context) {
 		return
 	}
 
-	processors, err := h.storage.GetProcessorsByPipelineID(id)
+	processors, err := h.storage.GetProcessorsFromPipeline(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -144,7 +144,7 @@ func (h *PipelinesHandler) ClearPipelineByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Pipeline cleared successfully"})
 }
 
-func PipelinesRegisterRoutes(r *gin.Engine, sources *service.SourceManager, storage *storage.Storage) {
+func PipelinesRegisterRoutes(r *gin.Engine, sources *service.SourceService, storage *storage.Storage) {
 	handler := NewPipelinesHandler(storage, sources)
 	pipelinesGroup := r.Group("/pipelines")
 

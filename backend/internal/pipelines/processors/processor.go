@@ -25,7 +25,7 @@ type Processor interface {
 
 func Process(p model.PipelineProcessor, logData *model.LogData) error {
 	processor, err := New(p.Processor.Name, p.Config)
-	if err != nil {
+	if err != nil  {
 		return err
 	}
 	return processor.Process(*logData)
