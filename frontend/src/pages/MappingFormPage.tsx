@@ -91,6 +91,26 @@ export default function MappingFormPage() {
         }
     }
 
+    async function deleteMapping() {
+        if (isCreate) return;
+        if (!window.confirm("¿Estás seguro de que quieres eliminar este campo?")) {
+            return;
+        }
+
+        setSubmitting(true);
+        setError("");
+        try {
+            const next = fields.filter((_, i) => i !== index);
+            await setGlobalMapping(next);
+            refetch();
+            closeDrawer();
+        } catch (err) {
+            setError((err as Error).message || "Error eliminando el mapping");
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
     if (loading) return <LoadingState message='Cargando mapping…' />;
 
     return (
@@ -111,13 +131,23 @@ export default function MappingFormPage() {
                         <h1 className='text-xl font-semibold text-text-logo'>
                             {isCreate ? "Nuevo campo" : "Editar campo"}
                         </h1>
-                        <button
-                            type='button'
-                            onClick={closeDrawer}
-                            className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
-                        >
-                            Cerrar
-                        </button>
+                        <div className='flex items-center gap-2'>
+                            <button
+                                type='button'
+                                onClick={deleteMapping}
+                                disabled={isCreate || submitting}
+                                className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30 disabled:opacity-50'
+                            >
+                                Eliminar
+                            </button>
+                            <button
+                                type='button'
+                                onClick={closeDrawer}
+                                className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
+                            >
+                                Cerrar
+                            </button>
+                        </div>
                     </div>
 
                     <div className='flex-1 overflow-y-auto p-6'>
@@ -144,7 +174,8 @@ export default function MappingFormPage() {
                                                     ? {
                                                           ...prev,
                                                           fieldname:
-                                                              event.target.value,
+                                                              event.target
+                                                                  .value,
                                                       }
                                                     : prev,
                                             )
@@ -159,21 +190,27 @@ export default function MappingFormPage() {
                                     </label>
                                     <select
                                         className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
-                                        value={draft?.fieldtypeid ?? defaultTypeId}
+                                        value={
+                                            draft?.fieldtypeid ?? defaultTypeId
+                                        }
                                         onChange={(event) =>
                                             setDraft((prev) =>
                                                 prev
                                                     ? {
                                                           ...prev,
                                                           fieldtypeid:
-                                                              event.target.value,
+                                                              event.target
+                                                                  .value,
                                                       }
                                                     : prev,
                                             )
                                         }
                                     >
                                         {typeOptions.map((option) => (
-                                            <option key={option.id} value={option.id}>
+                                            <option
+                                                key={option.id}
+                                                value={option.id}
+                                            >
                                                 {option.label}
                                             </option>
                                         ))}
@@ -193,7 +230,8 @@ export default function MappingFormPage() {
                                                     ? {
                                                           ...prev,
                                                           defaultvalue:
-                                                              event.target.value,
+                                                              event.target
+                                                                  .value,
                                                       }
                                                     : prev,
                                             )

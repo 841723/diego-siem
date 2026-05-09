@@ -6,7 +6,7 @@ import type { LogEntry, TimeWindow } from "../types";
 export const FIXED_PAGE_SIZE = 100;
 export const MAX_LOG_PAGES = 5;
 export const PAGE_SIZE_OPTIONS = [FIXED_PAGE_SIZE] as const;
-export const DEFAULT_COLUMNS = ["timestamp", "sourceid", "processed"];
+export const DEFAULT_COLUMNS = ["timestamp", "sourceid", "numseq"];
 
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;

@@ -158,6 +158,19 @@ export async function getLogs(
             timeWindow,
             from,
             size,
+            query: {},
+            aggs: [
+                // {
+                //     name: "total",
+                //     type: "count",
+                //     field: "timestamp",
+                // },
+                {
+                    name: "mean_numseq",
+                    type: "avg",
+                    field: "numseq",
+                }
+            ],
         }),
     });
     const { logs, total } = payload as { logs: unknown[]; total: number };

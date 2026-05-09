@@ -53,7 +53,7 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
                         {columns.map((col, idx) => (
                             <div
                                 key={col}
-                                className='group relative p-1 border-3 border-transparent text-xs wrap-break-word h-8 my-auto hover:border-primary hover:rounded-r hover:rounded-b'
+                                className='group relative p-1 border-3 border-transparent text-xs wrap-break-word my-auto hover:border-primary hover:rounded-r hover:rounded-b h-full'
                             >
                                 <span className='line-clamp-2 font-mono'>
                                     {getCellValue(loading, log, col)}
