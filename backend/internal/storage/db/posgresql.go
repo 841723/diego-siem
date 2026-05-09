@@ -619,8 +619,9 @@ func (db *PostgreSQLDB) GetMappingsFromDB() ([]model.Mapping, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	rows, err := db.pool.Query(ctx, `
-		SELECT fieldname, fieldtypeid, defaultvalue
+		SELECT fieldname, fieldtypeid, defaultvalue, mappingtype.id, mappingtype.typename, mappingtype.displayname
 		FROM mapping
+		JOIN mappingtype ON mapping.fieldtypeid = mappingtype.id
 	`)
 	if err != nil {
 		return nil, err
@@ -636,6 +637,9 @@ func (db *PostgreSQLDB) GetMappingsFromDB() ([]model.Mapping, error) {
 			&m.FieldName,
 			&m.FieldTypeID,
 			&m.DefaultValue,
+			&m.FieldType.ID,
+			&m.FieldType.TypeName,
+			&m.FieldType.DisplayName,
 		)
 		if err != nil {
 			return nil, err
@@ -649,11 +653,20 @@ func (db *PostgreSQLDB) GetMappingsFromDB() ([]model.Mapping, error) {
 	return mappings, nil
 }
 
-func (db *PostgreSQLDB) DeleteMappingsFromDB() error {
+func (db *PostgreSQLDB) DeleteAllMappingsFromDB() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := db.pool.Exec(ctx,
 		"DELETE FROM Mapping WHERE true")
+	return err
+}
+
+func (db *PostgreSQLDB) DeleteMappingFromDB(mappingID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.pool.Exec(ctx,
+		"DELETE FROM Mapping WHERE fieldname = $1",
+		mappingID)
 	return err
 }
 
@@ -693,6 +706,26 @@ func (db *PostgreSQLDB) GetMappingTypesFromDB() ([]model.MappingType, error) {
 		return nil, err
 	}
 	return types, nil
+}
+
+func (db *PostgreSQLDB) GetMappingTypeByIDFromDB(typeID model.ID) (model.MappingType, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var t model.MappingType
+
+	err := db.pool.QueryRow(ctx, `
+		SELECT id, typename, displayname
+		FROM mappingtype
+		WHERE id = $1
+	`, typeID).Scan(&t.ID, &t.TypeName, &t.DisplayName)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.MappingType{}, nil
+	}
+	if err != nil {
+		return model.MappingType{}, err
+	}
+
+	return t, nil
 }
 
 func (db *PostgreSQLDB) IsValidMappingType(dataType string) (bool, error) {

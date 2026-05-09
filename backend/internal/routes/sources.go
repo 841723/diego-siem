@@ -11,11 +11,11 @@ import (
 )
 
 type SourceHandler struct {
-	svc     *service.SourceManager
+	svc     *service.SourceService
 	storage *storage.Storage
 }
 
-func NewSourceHandler(svc *service.SourceManager, storage *storage.Storage) *SourceHandler {
+func NewSourceHandler(svc *service.SourceService, storage *storage.Storage) *SourceHandler {
 	return &SourceHandler{svc: svc, storage: storage}
 }
 
@@ -118,7 +118,7 @@ func (h *SourceHandler) TestEndpoint(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Test column added to logs"})
 }
 
-func SourcesRegisterRoutes(r *gin.Engine, svc *service.SourceManager, storage *storage.Storage) {
+func SourcesRegisterRoutes(r *gin.Engine, svc *service.SourceService, storage *storage.Storage) {
 	handler := NewSourceHandler(svc, storage)
 	sourcesGroup := r.Group("/sources")
 

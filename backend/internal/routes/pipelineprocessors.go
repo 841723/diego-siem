@@ -12,10 +12,10 @@ import (
 
 type PipelineProcessorsHandler struct {
 	storage *storage.Storage
-	sources *service.SourceManager
+	sources *service.SourceService
 }
 
-func NewPipelineProcessorsHandler(storage *storage.Storage, sources *service.SourceManager) *PipelineProcessorsHandler {
+func NewPipelineProcessorsHandler(storage *storage.Storage, sources *service.SourceService) *PipelineProcessorsHandler {
 	return &PipelineProcessorsHandler{storage: storage, sources: sources}
 }
 
@@ -168,7 +168,7 @@ func (h *PipelineProcessorsHandler) DeleteProcessorFromPipeline(c *gin.Context) 
 	c.JSON(200, gin.H{"message": "Processor deleted successfully"})
 }
 
-func PipelineProcessorsRegisterRoutes(r *gin.Engine, processorsGroup *gin.RouterGroup, sources *service.SourceManager, storage *storage.Storage) {
+func PipelineProcessorsRegisterRoutes(r *gin.Engine, processorsGroup *gin.RouterGroup, sources *service.SourceService, storage *storage.Storage) {
 	handler := NewPipelineProcessorsHandler(storage, sources)
 	processorsGroup.Use(handler.ProcessorMiddleware)
 

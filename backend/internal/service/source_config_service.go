@@ -27,7 +27,7 @@ type SourceConfigRuntime struct {
 	StopChan chan struct{}
 }
 
-func (s *SourceManager) NewSourceConfigRuntime(cfg model.SourceConfig) model.ID {
+func (s *SourceService) NewSourceConfigRuntime(cfg model.SourceConfig) model.ID {
 	max_items_channels := 100
 	parsed_ch := make(chan model.Log, max_items_channels)
 	storage_ch := make(chan model.Log, max_items_channels)
@@ -80,14 +80,14 @@ func (src *SourceConfigRuntime) waitAndStoreLogs(s *storage.Storage) {
 	}
 }
 
-type SourceManager struct {
+type SourceService struct {
 	sources map[string]*SourceConfigRuntime
 	storage *storage.Storage
 	mu      sync.Mutex
 }
 
-func NewSourceManager(s *storage.Storage) *SourceManager {
-	sm := &SourceManager{
+func NewSourceService(s *storage.Storage) *SourceService {
+	sm := &SourceService{
 		sources: make(map[string]*SourceConfigRuntime),
 		storage: s,
 	}
@@ -104,7 +104,7 @@ func NewSourceManager(s *storage.Storage) *SourceManager {
 	return sm
 }
 
-func (s *SourceManager) AddSource(cfg model.SourceConfig) (*model.SourceConfig, error) {
+func (s *SourceService) AddSource(cfg model.SourceConfig) (*model.SourceConfig, error) {
 	if !sourceConfigIsFullToUpsert(cfg) {
 		return nil, errors.New("source config is missing required fields")
 	}
@@ -129,7 +129,7 @@ func (s *SourceManager) AddSource(cfg model.SourceConfig) (*model.SourceConfig, 
 	return &cfg, nil
 }
 
-func (s *SourceManager) UpdateSource(cfg model.SourceConfig) (*model.SourceConfig, error) {
+func (s *SourceService) UpdateSource(cfg model.SourceConfig) (*model.SourceConfig, error) {
 	if !sourceConfigIsFullToUpsert(cfg) {
 		return nil, errors.New("source config is missing required fields")
 	}
@@ -167,7 +167,7 @@ func (s *SourceManager) UpdateSource(cfg model.SourceConfig) (*model.SourceConfi
 	return &cfg, nil
 }
 
-func (s *SourceManager) UpdatePipelineInSourceConfig(updatedPipelineID model.ID) error {
+func (s *SourceService) UpdatePipelineInSourceConfig(updatedPipelineID model.ID) error {
 	for _, sourceRuntime := range s.sources {
 		if s.storage.SourceUsesPipeline(sourceRuntime.Config.PipelineID, updatedPipelineID) {
 			newPipeline, err := s.storage.GetCompiledPipelineByPipelineID(sourceRuntime.Config.PipelineID)
@@ -180,7 +180,7 @@ func (s *SourceManager) UpdatePipelineInSourceConfig(updatedPipelineID model.ID)
 	return nil
 }
 
-func (s *SourceManager) GetSources() ([]model.SourceConfig, error) {
+func (s *SourceService) GetSources() ([]model.SourceConfig, error) {
 	sources, err := s.storage.GetSources()
 	if err != nil {
 		// Handle error
@@ -189,7 +189,7 @@ func (s *SourceManager) GetSources() ([]model.SourceConfig, error) {
 	return sources, nil
 }
 
-func (s *SourceManager) GetSourceByID(id model.ID) (*model.SourceConfig, error) {
+func (s *SourceService) GetSourceByID(id model.ID) (*model.SourceConfig, error) {
 	source, err := s.storage.GetSourceByID(id)
 	if err != nil {
 		// Handle error
@@ -198,17 +198,17 @@ func (s *SourceManager) GetSourceByID(id model.ID) (*model.SourceConfig, error) 
 	return source, nil
 }
 
-func (s *SourceManager) ClearSources() error {
+func (s *SourceService) ClearSources() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return errors.New("not implemented")
 }
 
-func (s *SourceManager) ClearSourceByID(id model.ID) error {
+func (s *SourceService) ClearSourceByID(id model.ID) error {
 	return s.storage.DeleteSourceByID(id)
 }
 
-func (s *SourceManager) StartSource(id model.ID) {
+func (s *SourceService) StartSource(id model.ID) {
 	src := s.sources[id.String()]
 	if src == nil {
 		return
@@ -223,7 +223,7 @@ func (s *SourceManager) StartSource(id model.ID) {
 	go src.waitAndStoreLogs(s.storage)
 }
 
-func (s *SourceManager) StopSource(id model.ID) {
+func (s *SourceService) StopSource(id model.ID) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -17,7 +17,7 @@ func NewMappingHandler(storage *storage.Storage) *MappingHandler {
 	return &MappingHandler{storage: storage}
 }
 
-func (h *MappingHandler) SetMapping(c *gin.Context) {
+func (h *MappingHandler) SetMappings(c *gin.Context) {
 	var req []model.Mapping
 
 	if err := c.BindJSON(&req); err != nil {
@@ -25,7 +25,7 @@ func (h *MappingHandler) SetMapping(c *gin.Context) {
 		return
 	}
 
-	err := h.storage.DeleteMappings()
+	err := h.storage.DeleteAllMappings()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -54,6 +54,25 @@ func (h *MappingHandler) GetMappings(c *gin.Context) {
 	c.JSON(http.StatusOK, mappings)
 }
 
+func (h *MappingHandler) DeleteMapping(c *gin.Context) {
+	id := c.Param("id")
+	err := h.storage.DeleteMapping(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Mapping deleted successfully"})
+}
+
+func (h *MappingHandler) DeleteAllMappings(c *gin.Context) {
+	err := h.storage.DeleteAllMappings()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "All mappings deleted successfully"})
+}
+
 func (h *MappingHandler) GetMappingTypes(c *gin.Context) {
 	types, err := h.storage.GetMappingTypes()
 	if err != nil {
@@ -70,8 +89,10 @@ func MappingRegisterRoutes(r *gin.Engine, storage *storage.Storage) {
 	handler := NewMappingHandler(storage)
 	mappingGroup := r.Group("/mappings")
 
-	mappingGroup.POST("", handler.SetMapping)
+	mappingGroup.POST("", handler.SetMappings)
 	mappingGroup.GET("", handler.GetMappings)
+	mappingGroup.DELETE("/:id", handler.DeleteMapping)
+	mappingGroup.DELETE("", handler.DeleteAllMappings)
 
 	mappingGroup.GET("/types", handler.GetMappingTypes)
 }
