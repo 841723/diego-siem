@@ -8,14 +8,14 @@ from multiprocessing import Process
 
 
 def create_log_generator(
-    SYSLOG_HOST = "backend",
-    SYSLOG_PORT = 9001,
-    services = ["auth", "db", "api", "payment"],
-    levels = ["INFO", "WARN", "ERROR"],
-    HOSTNAME = "log-generator",
-    APP_NAME = "mini-siem",
-    PROCID = "-",
-    MSGID = "-"
+    log_SYSLOG_HOST = "backend",
+    log_SYSLOG_PORT = 9001,
+    log_services = ["auth", "db", "api", "payment"],
+    log_levels = ["INFO", "WARN", "ERROR"],
+    log_HOSTNAME = "log-generator",
+    log_APP_NAME = "mini-siem",
+    log_PROCID = "-",
+    log_MSGID = "-"
 ):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     counter = 0
@@ -27,15 +27,15 @@ def create_log_generator(
         VERSION = 1
         TIMESTAMP = datetime.now(timezone.utc).isoformat()
         
-        header = f"<{PRI}>{VERSION} {TIMESTAMP} {HOSTNAME} {APP_NAME} {PROCID} {MSGID} -"
+        header = f"<{PRI}>{VERSION} {TIMESTAMP} {log_HOSTNAME} {log_APP_NAME} {log_PROCID} {log_MSGID} -"
         
         return f"{header} {payload}"
 
     while True:
         log = {
-            "service": random.choice(services),
+            "service": random.choice(log_services),
             "message": f"Event {random.randint(1000,9999)}",
-            "level": random.choice(levels),
+            "level": random.choice(log_levels),
             "numseq": counter
         }
         counter += 1
@@ -44,12 +44,13 @@ def create_log_generator(
             payload = json.dumps(log)
             msg = build_syslog_message(payload)
 
-            sock.sendto(msg.encode(), (SYSLOG_HOST, SYSLOG_PORT))
+            sock.sendto(msg.encode(), (log_SYSLOG_HOST, log_SYSLOG_PORT))
 
         except Exception as e:
             print("error:", e)
 
-        time.sleep(1)
+        delay = random.uniform(0.1, 1.0)
+        time.sleep(delay)
 
 
 SYSLOG_HOST = "backend"
@@ -86,8 +87,8 @@ if __name__ == "__main__":
         p = Process(target=create_log_generator, args=(
             SYSLOG_HOST,
             SYSLOG_PORT[i],
-            random.choice(services[i]),
-            random.choice(levels[i]),
+            services[i],
+            levels[i],
             HOSTNAME[i],
             APP_NAME,
             PROCID,
