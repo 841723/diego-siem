@@ -69,7 +69,7 @@ export default function SourcesPage() {
                         rows={tableRows}
                         emptyMessage='No hay fuentes configuradas'
                         onRowClick={(rowIndex) =>
-                            navigate(`/sources/${sortedSources[rowIndex].id}`)
+                            navigate(`/sources/${sortedSources[rowIndex].id}/edit`)
                         }
                     />
                 )}

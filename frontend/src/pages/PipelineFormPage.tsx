@@ -1,18 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import {
-    useLocation,
-    useMatch,
-    useNavigate,
-    useParams,
-} from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import ConfirmModal from "../components/ConfirmModal";
 import LoadingState from "../components/LoadingState";
-import {
-    type PipelineDraft,
-    type PipelineProcessorDraftItem,
-    usePipelineDraft,
-} from "../hooks/usePipelineDraft";
 import { useProcessors } from "../hooks/useProcessors";
+import { useSources } from "../hooks/useSources";
 import {
     createPipeline,
     deletePipeline,
@@ -22,8 +13,18 @@ import {
 } from "../services/api";
 import type { ProcessorDefinition } from "../types";
 
-type PipelineDuplicateState = {
-    draft?: PipelineDraft;
+type DraftProcessor = {
+    localId: string;
+    id?: string;
+    processorid: string;
+    humanDescription: string;
+    config: Record<string, unknown>;
+};
+
+type PipelineDraftState = {
+    name: string;
+    description: string;
+    processors: DraftProcessor[];
 };
 
 function isBooleanType(value: unknown): boolean {
@@ -50,23 +51,7 @@ function emptyConfigFor(def: ProcessorDefinition): Record<string, unknown> {
     return config;
 }
 
-function normalizePipelineDraftFromFull(
-    full: Awaited<ReturnType<typeof getPipelineFull>>,
-): PipelineDraft {
-    const ordered = [...full.processors].sort((a, b) => a.order - b.order);
-    return {
-        name: full.pipeline.name,
-        description: full.pipeline.description,
-        processors: ordered.map((processor) => ({
-            localId: crypto.randomUUID(),
-            id: processor.id,
-            processorid: processor.processorid,
-            config: processor.config,
-        })),
-    };
-}
-
-function resolveProcessorDefinition(
+function resolveDefinition(
     definitions: ProcessorDefinition[],
     processorId: string,
 ): ProcessorDefinition | null {
@@ -74,173 +59,153 @@ function resolveProcessorDefinition(
 }
 
 export default function PipelineFormPage() {
-    const { id, processorId } = useParams<{ id: string; processorId: string }>();
-    const navigate = useNavigate();
-    const location = useLocation();
-    const isProcessorCreateRoute = useMatch("/pipelines/:id/processors/new") !== null;
-    const isProcessorEditRoute = useMatch("/pipelines/:id/processors/:processorId/edit") !== null;
+    const { id } = useParams<{ id: string }>();
     const isEdit = Boolean(id);
-    const scope = id ?? "new";
+    const navigate = useNavigate();
+    const { processors: processorDefs, loading: loadingDefs } = useProcessors();
+    const { sources } = useSources();
 
-    const { processors: processorDefs, loading: defsLoading } = useProcessors();
-    const { loadDraft, saveDraft, clearDraft } = usePipelineDraft(scope);
-
-    const [draft, setDraft] = useState<PipelineDraft>({
+    const [draft, setDraft] = useState<PipelineDraftState>({
         name: "",
         description: "",
         processors: [],
     });
-    const [loadingDraft, setLoadingDraft] = useState(true);
+    const [loading, setLoading] = useState(isEdit);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
-    const [confirmDeletePipeline, setConfirmDeletePipeline] = useState(false);
+    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
 
-    const selectedProcessorIndex = useMemo(() => {
-        if (!isProcessorEditRoute || !processorId) return -1;
-        return draft.processors.findIndex(
-            (item) => item.id === processorId || item.localId === processorId,
-        );
-    }, [draft.processors, isProcessorEditRoute, processorId]);
+    const [modalIndex, setModalIndex] = useState<number | null>(null);
+    const [modalDraft, setModalDraft] = useState<DraftProcessor | null>(null);
 
-    const selectedProcessor =
-        selectedProcessorIndex >= 0 ? draft.processors[selectedProcessorIndex] : null;
-    const selectedProcessorDef = selectedProcessor
-        ? resolveProcessorDefinition(processorDefs, selectedProcessor.processorid)
-        : null;
+    const sourceCountUsingPipeline = useMemo(() => {
+        if (!id) return 0;
+        return sources.filter((source) => source.pipelineid === id).length;
+    }, [id, sources]);
 
     useEffect(() => {
         let cancelled = false;
-        async function initDraft() {
-            setLoadingDraft(true);
+        async function loadPipeline() {
+            if (!isEdit || !id) {
+                setDraft({ name: "", description: "", processors: [] });
+                setLoading(false);
+                return;
+            }
+
+            setLoading(true);
             setError("");
             try {
-                const fromStorage = loadDraft();
-                if (fromStorage) {
-                    if (!cancelled) setDraft(fromStorage);
-                    return;
-                }
-
-                const duplicateState = location.state as PipelineDuplicateState | null;
-                if (duplicateState?.draft) {
-                    if (!cancelled) setDraft(duplicateState.draft);
-                    return;
-                }
-
-                if (isEdit && id) {
-                    const full = await getPipelineFull(id);
-                    if (!cancelled) setDraft(normalizePipelineDraftFromFull(full));
-                    return;
-                }
-
-                if (!cancelled) {
-                    setDraft({
-                        name: "",
-                        description: "",
-                        processors: [],
-                    });
-                }
+                const full = await getPipelineFull(id);
+                if (cancelled) return;
+                const ordered = [...full.processors].sort((a, b) => a.order - b.order);
+                setDraft({
+                    name: full.pipeline.name,
+                    description: full.pipeline.description,
+                    processors: ordered.map((processor) => ({
+                        localId: crypto.randomUUID(),
+                        id: processor.id,
+                        processorid: processor.processorid,
+                        humanDescription:
+                            (typeof processor.config.humanDescription === "string"
+                                ? processor.config.humanDescription
+                                : undefined) ??
+                            processor.processor?.humanDescription ??
+                            processor.processor?.description ??
+                            "",
+                        config: processor.config,
+                    })),
+                });
             } catch (err) {
                 if (!cancelled) {
                     setError((err as Error).message || "Error cargando pipeline");
                 }
             } finally {
-                if (!cancelled) setLoadingDraft(false);
+                if (!cancelled) setLoading(false);
             }
         }
-
-        void initDraft();
+        void loadPipeline();
         return () => {
             cancelled = true;
         };
-    }, [id, isEdit, loadDraft, location.state]);
-
-    useEffect(() => {
-        if (loadingDraft) return;
-        saveDraft(draft);
-    }, [draft, loadingDraft, saveDraft]);
-
-    useEffect(() => {
-        if (!isProcessorCreateRoute || !id || defsLoading || processorDefs.length === 0) {
-            return;
-        }
-        const processorDef = processorDefs[0];
-        const newProcessor: PipelineProcessorDraftItem = {
-            localId: crypto.randomUUID(),
-            processorid: processorDef.id,
-            config: emptyConfigFor(processorDef),
-        };
-        setDraft((prev) => ({
-            ...prev,
-            processors: [...prev.processors, newProcessor],
-        }));
-        navigate(`/pipelines/${id}/processors/${newProcessor.localId}/edit`, {
-            replace: true,
-        });
-    }, [defsLoading, id, isProcessorCreateRoute, navigate, processorDefs]);
-
-    function addLocalProcessor() {
-        if (defsLoading || processorDefs.length === 0) return;
-        const processorDef = processorDefs[0];
-        const nextProcessor: PipelineProcessorDraftItem = {
-            localId: crypto.randomUUID(),
-            processorid: processorDef.id,
-            config: emptyConfigFor(processorDef),
-        };
-        setDraft((prev) => ({
-            ...prev,
-            processors: [...prev.processors, nextProcessor],
-        }));
-    }
-
-    function updateProcessor(
-        processorIndex: number,
-        updater: (item: PipelineProcessorDraftItem) => PipelineProcessorDraftItem,
-    ) {
-        setDraft((prev) => ({
-            ...prev,
-            processors: prev.processors.map((item, index) =>
-                index === processorIndex ? updater(item) : item,
-            ),
-        }));
-    }
-
-    function removeProcessor(processorIndex: number) {
-        setDraft((prev) => ({
-            ...prev,
-            processors: prev.processors.filter((_, index) => index !== processorIndex),
-        }));
-    }
+    }, [id, isEdit]);
 
     function reorderProcessors(from: number, to: number) {
         setDraft((prev) => {
-            if (
-                from < 0 ||
-                to < 0 ||
-                from >= prev.processors.length ||
-                to >= prev.processors.length
-            ) {
+            const next = [...prev.processors];
+            if (from < 0 || to < 0 || from >= next.length || to >= next.length) {
                 return prev;
             }
-            const next = [...prev.processors];
             const [moved] = next.splice(from, 1);
             next.splice(to, 0, moved);
             return { ...prev, processors: next };
         });
     }
 
-    function submitDrop(targetIndex: number) {
+    function onDrop(targetIndex: number) {
         if (dragIndex === null) return;
         reorderProcessors(dragIndex, targetIndex);
         setDragIndex(null);
         setDropIndex(null);
     }
 
-    async function persistPipelineAndProcessors() {
-        const pipelineId = id ?? crypto.randomUUID();
-        if (isEdit && id) {
-            await updatePipeline(id, { name: draft.name, description: draft.description });
+    function openProcessorModal(index: number) {
+        const processor = draft.processors[index];
+        if (!processor) return;
+        setModalIndex(index);
+        setModalDraft({
+            ...processor,
+            config: { ...processor.config },
+        });
+    }
+
+    function applyModalChangesAndClose() {
+        if (modalIndex === null || !modalDraft) {
+            setModalIndex(null);
+            setModalDraft(null);
+            return;
+        }
+        setDraft((prev) => ({
+            ...prev,
+            processors: prev.processors.map((processor, index) =>
+                index === modalIndex ? modalDraft : processor,
+            ),
+        }));
+        setModalIndex(null);
+        setModalDraft(null);
+    }
+
+    function closeModalDiscardingChanges() {
+        setModalIndex(null);
+        setModalDraft(null);
+    }
+
+    function addProcessor() {
+        if (loadingDefs || processorDefs.length === 0) return;
+        const processorDef = processorDefs[0];
+        const newProcessor: DraftProcessor = {
+            localId: crypto.randomUUID(),
+            processorid: processorDef.id,
+            humanDescription:
+                processorDef.humanDescription || processorDef.description || "",
+            config: emptyConfigFor(processorDef),
+        };
+        setDraft((prev) => ({
+            ...prev,
+            processors: [...prev.processors, newProcessor],
+        }));
+        setModalIndex(draft.processors.length);
+        setModalDraft(newProcessor);
+    }
+
+    async function persistPipeline(nextId?: string) {
+        const pipelineId = nextId ?? id ?? crypto.randomUUID();
+        if (id) {
+            await updatePipeline(id, {
+                name: draft.name,
+                description: draft.description,
+            });
         } else {
             await createPipeline({
                 id: pipelineId,
@@ -249,15 +214,19 @@ export default function PipelineFormPage() {
             });
         }
 
-        const payload = draft.processors.map((item) => ({
-            id: item.id ?? crypto.randomUUID(),
-            processorid: item.processorid,
-            config: item.config,
-        }));
-        await updatePipelineProcessor(pipelineId, payload);
+        await updatePipelineProcessor(
+            pipelineId,
+            draft.processors.map((processor) => ({
+                id: processor.id ?? crypto.randomUUID(),
+                processorid: processor.processorid,
+                config: {
+                    ...processor.config,
+                    humanDescription: processor.humanDescription,
+                },
+            })),
+        );
 
-        clearDraft();
-        navigate(`/pipelines/${pipelineId}/edit`);
+        return pipelineId;
     }
 
     async function handleSavePipeline(event: FormEvent<HTMLFormElement>) {
@@ -265,7 +234,8 @@ export default function PipelineFormPage() {
         setSubmitting(true);
         setError("");
         try {
-            await persistPipelineAndProcessors();
+            const pipelineId = await persistPipeline();
+            navigate(`/pipelines/${pipelineId}/edit`);
         } catch (err) {
             setError((err as Error).message || "Error guardando pipeline");
         } finally {
@@ -273,17 +243,54 @@ export default function PipelineFormPage() {
         }
     }
 
+    async function handleDuplicatePipeline() {
+        setSubmitting(true);
+        setError("");
+        try {
+            const newPipelineId = crypto.randomUUID();
+            await createPipeline({
+                id: newPipelineId,
+                name: `${draft.name} (copia)`,
+                description: draft.description,
+            });
+            await updatePipelineProcessor(
+                newPipelineId,
+                draft.processors.map((processor) => ({
+                    id: crypto.randomUUID(),
+                    processorid: processor.processorid,
+                    config: {
+                        ...processor.config,
+                        humanDescription: processor.humanDescription,
+                    },
+                })),
+            );
+            navigate(`/pipelines/${newPipelineId}/edit`);
+        } catch (err) {
+            setError((err as Error).message || "Error duplicando pipeline");
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
     async function handleDeletePipeline() {
         if (!id) return;
+        if (sourceCountUsingPipeline > 0) {
+            setError(
+                `Cannot delete pipeline because it is being used by ${sourceCountUsingPipeline} sources`,
+            );
+            setConfirmDeleteOpen(false);
+            return;
+        }
+
         setSubmitting(true);
+        setError("");
         try {
             await deletePipeline(id);
-            clearDraft();
             navigate("/pipelines");
         } catch (err) {
             setError((err as Error).message || "Error eliminando pipeline");
             setSubmitting(false);
-            setConfirmDeletePipeline(false);
+            setConfirmDeleteOpen(false);
         }
     }
 
@@ -302,7 +309,7 @@ export default function PipelineFormPage() {
                     <input
                         type='checkbox'
                         className='h-4 w-4 accent-accent'
-                        checked={Boolean(value ?? false)}
+                        checked={Boolean(value)}
                         onChange={(event) => onChange(event.target.checked)}
                     />
                     {key}
@@ -357,108 +364,11 @@ export default function PipelineFormPage() {
         );
     }
 
-    if (loadingDraft) return <LoadingState message='Cargando pipeline…' />;
+    const modalProcessorDef = modalDraft
+        ? resolveDefinition(processorDefs, modalDraft.processorid)
+        : null;
 
-    if (isProcessorEditRoute && !selectedProcessor) {
-        return (
-            <main className='p-6'>
-                <p className='rounded bg-error/20 px-3 py-2 text-sm text-error'>
-                    Processor no encontrado en el estado local del pipeline.
-                </p>
-            </main>
-        );
-    }
-
-    if (isProcessorEditRoute && selectedProcessor && selectedProcessorDef) {
-        const schemaEntries = Object.entries(selectedProcessorDef.schema);
-        return (
-            <main className='flex flex-col h-full overflow-hidden'>
-                <div className='flex items-center justify-between gap-4 border-b border-border bg-background px-6 py-4 shrink-0'>
-                    <div className='flex items-center gap-4'>
-                        <button
-                            onClick={() => navigate(`/pipelines/${id}/edit`)}
-                            className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
-                        >
-                            ← Volver al pipeline
-                        </button>
-                        <h1 className='text-xl font-semibold text-text-logo'>
-                            Editar processor
-                        </h1>
-                    </div>
-                    <button
-                        onClick={() => {
-                            removeProcessor(selectedProcessorIndex);
-                            navigate(`/pipelines/${id}/edit`);
-                        }}
-                        className='rounded border border-error/50 px-3 py-1.5 text-sm text-error hover:bg-error/10'
-                    >
-                        Eliminar processor
-                    </button>
-                </div>
-
-                <div className='flex-1 overflow-y-auto p-6'>
-                    <div className='mx-auto max-w-3xl space-y-4'>
-                        <div className='space-y-1'>
-                            <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
-                                Tipo de processor
-                            </label>
-                            <select
-                                className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
-                                value={selectedProcessor.processorid}
-                                onChange={(event) => {
-                                    const nextDef = resolveProcessorDefinition(
-                                        processorDefs,
-                                        event.target.value,
-                                    );
-                                    updateProcessor(selectedProcessorIndex, (item) => ({
-                                        ...item,
-                                        processorid: event.target.value,
-                                        config: nextDef
-                                            ? emptyConfigFor(nextDef)
-                                            : item.config,
-                                    }));
-                                }}
-                            >
-                                {processorDefs.map((processor) => (
-                                    <option key={processor.id} value={processor.id}>
-                                        {processor.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <p className='text-xs text-muted'>
-                                {selectedProcessorDef.humanDescription ||
-                                    selectedProcessorDef.description}
-                            </p>
-                        </div>
-
-                        <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
-                            {schemaEntries.map(([key, schemaType]) =>
-                                renderConfigField(
-                                    key,
-                                    schemaType,
-                                    selectedProcessor.config[key],
-                                    (nextValue) =>
-                                        updateProcessor(selectedProcessorIndex, (item) => ({
-                                            ...item,
-                                            config: {
-                                                ...item.config,
-                                                [key]: nextValue,
-                                            },
-                                        })),
-                                ),
-                            )}
-                        </div>
-
-                        {error && (
-                            <p className='rounded bg-error/20 px-3 py-2 text-sm text-error'>
-                                {error}
-                            </p>
-                        )}
-                    </div>
-                </div>
-            </main>
-        );
-    }
+    if (loading) return <LoadingState message='Cargando pipeline…' />;
 
     return (
         <main className='flex h-full flex-col overflow-hidden'>
@@ -475,32 +385,19 @@ export default function PipelineFormPage() {
                             {isEdit ? "Editar pipeline" : "Nuevo pipeline"}
                         </h1>
                     </div>
-                    {isEdit && id && (
+                    {isEdit && (
                         <div className='flex gap-2'>
                             <button
                                 type='button'
-                                onClick={() =>
-                                    navigate("/pipelines/new", {
-                                        state: {
-                                            draft: {
-                                                ...draft,
-                                                name: `${draft.name} (copia)`,
-                                                processors: draft.processors.map((item) => ({
-                                                    ...item,
-                                                    id: undefined,
-                                                    localId: crypto.randomUUID(),
-                                                })),
-                                            },
-                                        } satisfies PipelineDuplicateState,
-                                    })
-                                }
-                                className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
+                                onClick={handleDuplicatePipeline}
+                                disabled={submitting}
+                                className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30 disabled:opacity-50'
                             >
                                 Duplicar
                             </button>
                             <button
                                 type='button'
-                                onClick={() => setConfirmDeletePipeline(true)}
+                                onClick={() => setConfirmDeleteOpen(true)}
                                 className='rounded border border-error/50 px-3 py-1.5 text-sm text-error hover:bg-error/10'
                             >
                                 Eliminar
@@ -552,35 +449,21 @@ export default function PipelineFormPage() {
                                 <span className='text-xs font-semibold uppercase tracking-wider text-muted'>
                                     Processors
                                 </span>
-                                {id ? (
-                                    <button
-                                        type='button'
-                                        onClick={() =>
-                                            navigate(`/pipelines/${id}/processors/new`)
-                                        }
-                                        className='rounded border border-border px-2 py-1 text-xs text-muted hover:bg-primary/30'
-                                    >
-                                        + Añadir processor
-                                    </button>
-                                ) : (
-                                    <button
-                                        type='button'
-                                        onClick={addLocalProcessor}
-                                        className='rounded border border-border px-2 py-1 text-xs text-muted hover:bg-primary/30'
-                                    >
-                                        + Añadir processor
-                                    </button>
-                                )}
+                                <button
+                                    type='button'
+                                    onClick={addProcessor}
+                                    className='rounded border border-border px-2 py-1 text-xs text-muted hover:bg-primary/30'
+                                >
+                                    + Añadir processor
+                                </button>
                             </div>
 
                             <div className='space-y-2'>
                                 {draft.processors.map((processor, index) => {
-                                    const definition = resolveProcessorDefinition(
+                                    const definition = resolveDefinition(
                                         processorDefs,
                                         processor.processorid,
                                     );
-                                    const processorRouteId =
-                                        processor.id ?? processor.localId;
                                     const isDropTarget = dropIndex === index;
                                     return (
                                         <div key={processor.localId} className='space-y-1'>
@@ -600,61 +483,37 @@ export default function PipelineFormPage() {
                                                 }}
                                                 onDrop={(event) => {
                                                     event.preventDefault();
-                                                    submitDrop(index);
+                                                    onDrop(index);
                                                 }}
-                                                onClick={() => {
-                                                    if (!id) return;
-                                                    navigate(
-                                                        `/pipelines/${id}/processors/${processorRouteId}/edit`,
-                                                    );
-                                                }}
-                                                className={`rounded border border-border bg-surface/70 p-3 transition-all ${
-                                                    id
-                                                        ? "cursor-pointer hover:bg-surface"
-                                                        : "cursor-default"
-                                                } ${
+                                                onClick={() => openProcessorModal(index)}
+                                                className={`rounded border border-border bg-surface/70 p-3 transition-all cursor-pointer hover:bg-surface ${
                                                     dragIndex === index
                                                         ? "opacity-60 scale-[0.99]"
                                                         : ""
                                                 }`}
                                             >
-                                                <div className='flex items-center justify-between'>
-                                                    <div className='flex items-center gap-2'>
-                                                        <span className='flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs text-muted'>
-                                                            {index + 1}
-                                                        </span>
-                                                        <div>
-                                                            <p className='text-sm font-semibold text-text'>
-                                                                {definition?.name ??
-                                                                    processor.processorid}
-                                                            </p>
-                                                            <p className='text-xs text-muted'>
-                                                                {definition?.humanDescription ||
-                                                                    definition?.description ||
-                                                                    "Sin descripción"}
-                                                            </p>
-                                                        </div>
+                                                <div className='flex items-center gap-2'>
+                                                    <span className='flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs text-muted'>
+                                                        {index + 1}
+                                                    </span>
+                                                    <div>
+                                                        <p className='text-sm font-semibold text-text'>
+                                                            {definition?.name ??
+                                                                processor.processorid}
+                                                        </p>
+                                                        <p className='text-xs text-muted'>
+                                                            {processor.humanDescription ||
+                                                                definition?.humanDescription ||
+                                                                definition?.description ||
+                                                                "Sin descripción"}
+                                                        </p>
                                                     </div>
-                                                    {!id && (
-                                                        <button
-                                                            type='button'
-                                                            onClick={(event) => {
-                                                                event.stopPropagation();
-                                                                removeProcessor(index);
-                                                            }}
-                                                            className='rounded border border-error/50 px-2 py-0.5 text-xs text-error hover:bg-error/10'
-                                                        >
-                                                            Eliminar
-                                                        </button>
-                                                    )}
                                                 </div>
                                             </div>
                                         </div>
                                     );
                                 })}
-                                {dropIndex === draft.processors.length && (
-                                    <div className='h-1 rounded bg-accent/80 transition-all' />
-                                )}
+
                                 {draft.processors.length === 0 && (
                                     <p className='rounded border border-border bg-surface/60 px-3 py-4 text-sm text-muted'>
                                         Añade al menos un processor.
@@ -689,12 +548,170 @@ export default function PipelineFormPage() {
                 </div>
             </div>
 
+            {modalDraft && modalProcessorDef && (
+                <div className='fixed inset-0 z-50'>
+                    <div
+                        className='absolute inset-0 bg-black/40'
+                        onClick={applyModalChangesAndClose}
+                        aria-hidden='true'
+                    />
+                    <aside className='absolute right-0 top-0 h-full w-full max-w-xl border-l border-border bg-background shadow-2xl'>
+                        <div className='flex h-full flex-col'>
+                            <div className='flex items-center justify-between border-b border-border px-6 py-4'>
+                                <div>
+                                    <h2 className='text-lg font-semibold text-text-logo'>
+                                        {modalProcessorDef.name}
+                                    </h2>
+                                    <p className='text-xs text-muted'>
+                                        {modalDraft.humanDescription ||
+                                            modalProcessorDef.humanDescription ||
+                                            modalProcessorDef.description}
+                                    </p>
+                                </div>
+                                <button
+                                    type='button'
+                                    onClick={applyModalChangesAndClose}
+                                    className='rounded border border-border px-3 py-1.5 text-sm text-muted hover:bg-primary/30'
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+
+                            <div className='flex-1 overflow-y-auto p-6 space-y-4'>
+                                <div className='space-y-1'>
+                                    <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                                        Tipo de processor
+                                    </label>
+                                    <select
+                                        className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                                        value={modalDraft.processorid}
+                                        onChange={(event) => {
+                                            const nextDef = resolveDefinition(
+                                                processorDefs,
+                                                event.target.value,
+                                            );
+                                            if (!nextDef) return;
+                                            setModalDraft((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          processorid:
+                                                              event.target.value,
+                                                          humanDescription:
+                                                              nextDef.humanDescription ||
+                                                              nextDef.description ||
+                                                              "",
+                                                          config: emptyConfigFor(
+                                                              nextDef,
+                                                          ),
+                                                      }
+                                                    : prev,
+                                            );
+                                        }}
+                                    >
+                                        {processorDefs.map((processor) => (
+                                            <option key={processor.id} value={processor.id}>
+                                                {processor.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className='space-y-1'>
+                                    <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
+                                        HumanDescription
+                                    </label>
+                                    <textarea
+                                        rows={3}
+                                        className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent'
+                                        value={modalDraft.humanDescription}
+                                        onChange={(event) =>
+                                            setModalDraft((prev) =>
+                                                prev
+                                                    ? {
+                                                          ...prev,
+                                                          humanDescription:
+                                                              event.target.value,
+                                                      }
+                                                    : prev,
+                                            )
+                                        }
+                                    />
+                                </div>
+
+                                <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                                    {Object.entries(modalProcessorDef.schema).map(
+                                        ([key, schemaType]) =>
+                                            renderConfigField(
+                                                key,
+                                                schemaType,
+                                                modalDraft.config[key],
+                                                (nextValue) =>
+                                                    setModalDraft((prev) =>
+                                                        prev
+                                                            ? {
+                                                                  ...prev,
+                                                                  config: {
+                                                                      ...prev.config,
+                                                                      [key]: nextValue,
+                                                                  },
+                                                              }
+                                                            : prev,
+                                                    ),
+                                            ),
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className='flex items-center justify-between border-t border-border px-6 py-4'>
+                                <button
+                                    type='button'
+                                    onClick={() => {
+                                        if (modalIndex === null) return;
+                                        setDraft((prev) => ({
+                                            ...prev,
+                                            processors: prev.processors.filter(
+                                                (_, index) => index !== modalIndex,
+                                            ),
+                                        }));
+                                        closeModalDiscardingChanges();
+                                    }}
+                                    className='rounded border border-error/50 px-4 py-2 text-sm text-error hover:bg-error/10'
+                                >
+                                    Eliminar processor
+                                </button>
+                                <div className='flex gap-3'>
+                                    <button
+                                        type='button'
+                                        onClick={closeModalDiscardingChanges}
+                                        className='rounded border border-border px-4 py-2 text-sm text-muted hover:bg-primary/30'
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type='button'
+                                        onClick={applyModalChangesAndClose}
+                                        className='rounded bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/80'
+                                    >
+                                        Guardar cambios
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            )}
+
             <ConfirmModal
-                open={confirmDeletePipeline}
+                open={confirmDeleteOpen}
                 title='Eliminar pipeline'
-                message='¿Seguro que quieres eliminar este pipeline?'
+                message={
+                    sourceCountUsingPipeline > 0
+                        ? `Cannot delete pipeline because it is being used by ${sourceCountUsingPipeline} sources`
+                        : "¿Seguro que quieres eliminar este pipeline?"
+                }
                 onConfirm={handleDeletePipeline}
-                onCancel={() => setConfirmDeletePipeline(false)}
+                onCancel={() => setConfirmDeleteOpen(false)}
             />
         </main>
     );

@@ -42,14 +42,6 @@ export default function App() {
                 <Route path="/pipelines/new" element={<PipelineFormPage />} />
                 <Route path="/pipelines/:id" element={<PipelineDetailPage />} />
                 <Route path="/pipelines/:id/edit" element={<PipelineFormPage />} />
-                <Route
-                    path="/pipelines/:id/processors/new"
-                    element={<PipelineFormPage />}
-                />
-                <Route
-                    path="/pipelines/:id/processors/:processorId/edit"
-                    element={<PipelineFormPage />}
-                />
 
                 {/* Rules */}
                 <Route path="/rules" element={<RulesPage />} />
