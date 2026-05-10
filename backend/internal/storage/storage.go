@@ -368,8 +368,28 @@ func (s *Storage) GetProcessorsByID(pipelineID model.ID) ([]model.Processor, err
 
 *********************************************************
 */
+func (s *Storage) SetMappings(mappings []model.Mapping) error {
+	for _, mapping := range mappings {
+		err := s.AddMapping(mapping)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Storage) AddMapping(mapping model.Mapping) error {
-	err := s.postgres.AddMappingToDB(mapping)
+	var err error
+	var mappingExists bool
+	_, mappingExists, err = s.postgres.GetMappingByFieldNameFromDB(mapping.FieldName)
+	if err != nil {
+		return fmt.Errorf("failed to check if mapping exists: %w", err)
+	}
+	if mappingExists {
+		return nil
+	}
+
+	err = s.postgres.AddMappingToDB(mapping)
 	if err != nil {
 		return err
 	}
@@ -396,16 +416,9 @@ func (s *Storage) GetMappings() ([]model.Mapping, error) {
 }
 
 func (s *Storage) DeleteMapping(mappingID string) error {
-	var mapping model.Mapping
-	var err error
-	mapping.FieldType, err = s.GetMappingTypesByID(mapping.FieldTypeID)
+	err := s.RemoveColumnFromLogs(mappingID)
 	if err != nil {
-		return fmt.Errorf("failed to get mapping for deletion: %w", err)
-	}
-
-	err = s.RemoveColumnFromLogs(mapping.FieldName)
-	if err != nil {
-		fmt.Printf("Failed to remove column for mapping %s: %v\n", mapping.FieldName, err)
+		fmt.Printf("Failed to remove column for mapping %s: %v\n", mappingID, err)
 		// Proceed with deleting the mapping even if column removal fails
 	}
 
@@ -417,7 +430,18 @@ func (s *Storage) DeleteMapping(mappingID string) error {
 }
 
 func (s *Storage) DeleteAllMappings() error {
-	return s.postgres.DeleteAllMappingsFromDB()
+	mappings, err := s.postgres.GetMappingsFromDB()
+	if err != nil {
+		return fmt.Errorf("failed to get mappings: %w", err)
+	}
+
+	for _, mapping := range mappings {
+		err = s.DeleteMapping(mapping.FieldName)
+		if err != nil {
+			return fmt.Errorf("failed to delete mapping %s: %w", mapping.FieldName, err)
+		}
+	}
+	return nil
 }
 
 /*

@@ -653,6 +653,34 @@ func (db *PostgreSQLDB) GetMappingsFromDB() ([]model.Mapping, error) {
 	return mappings, nil
 }
 
+func (db *PostgreSQLDB) GetMappingByFieldNameFromDB(fieldName string) (*model.Mapping, bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var m model.Mapping
+
+	err := db.pool.QueryRow(ctx, `
+		SELECT fieldname, fieldtypeid, defaultvalue, mappingtype.id, mappingtype.typename, mappingtype.displayname
+		FROM mapping
+		JOIN mappingtype ON mapping.fieldtypeid = mappingtype.id
+		WHERE fieldname = $1
+	`, fieldName).Scan(
+		&m.FieldName,
+		&m.FieldTypeID,
+		&m.DefaultValue,
+		&m.FieldType.ID,
+		&m.FieldType.TypeName,
+		&m.FieldType.DisplayName,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &m, true, nil
+}
+
 func (db *PostgreSQLDB) DeleteAllMappingsFromDB() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

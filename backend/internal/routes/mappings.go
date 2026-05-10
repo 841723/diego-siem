@@ -25,18 +25,10 @@ func (h *MappingHandler) SetMappings(c *gin.Context) {
 		return
 	}
 
-	err := h.storage.DeleteAllMappings()
+	err := h.storage.SetMappings(req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
-	}
-
-	for _, m := range req {
-		err := h.storage.AddMapping(m)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Mapping updated successfully"})
