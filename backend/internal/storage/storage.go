@@ -139,6 +139,10 @@ func (s *Storage) GetMeanOfField(req model.GetLogsRequest, fieldName string) (fl
 	return s.clickhouse.GetMeanOfFieldFromDB(req, fieldName)
 }
 
+func (s *Storage) StatsLogs(req model.GetLogsRequest, aggs model.AggsParam) (model.StatsAggResult, error) {
+	return s.clickhouse.StatsLogsFromDB(req, aggs)
+}
+
 /**********************************************************
 
 						Sources
@@ -369,10 +373,44 @@ func (s *Storage) GetProcessorsByID(pipelineID model.ID) ([]model.Processor, err
 *********************************************************
 */
 func (s *Storage) SetMappings(mappings []model.Mapping) error {
+	existingMappings, err := s.GetMappings()
+	if err != nil {
+		return fmt.Errorf("failed to get existing mappings: %w", err)
+	}
+
+	existingMappingMap := make(map[string]model.Mapping)
+	for _, mapping := range existingMappings {
+		existingMappingMap[mapping.FieldName] = mapping
+	}
+
 	for _, mapping := range mappings {
-		err := s.AddMapping(mapping)
+		if existing, exists := existingMappingMap[mapping.FieldName]; exists {
+			if existing.FieldTypeID != mapping.FieldTypeID || existing.DefaultValue != mapping.DefaultValue {
+				// Mapping has changed, update it
+				err := s.DeleteMapping(mapping.FieldName)
+				if err != nil {
+					return fmt.Errorf("failed to delete existing mapping for field %s: %w", mapping.FieldName, err)
+				}
+				err = s.AddMapping(mapping)
+				if err != nil {
+					return fmt.Errorf("failed to add updated mapping for field %s: %w", mapping.FieldName, err)
+				}
+			}
+			delete(existingMappingMap, mapping.FieldName)
+		} else {
+			// New mapping, add it
+			err := s.AddMapping(mapping)
+			if err != nil {
+				return fmt.Errorf("failed to add new mapping for field %s: %w", mapping.FieldName, err)
+			}
+		}
+	}
+
+	for fieldName := range existingMappingMap {
+		// Mapping was removed, delete it
+		err := s.DeleteMapping(fieldName)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to delete old mapping for field %s: %w", fieldName, err)
 		}
 	}
 	return nil

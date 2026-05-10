@@ -170,37 +170,93 @@ func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsRequest, dynamicColumn
 	return results, rows.Err()
 }
 
-func (db *ClickHouseDB) GetAggsFromDB(params model.GetLogsRequest, aggs model.AggsParam) ([]model.AggsBucket, error) {
+func (db *ClickHouseDB) StatsLogsFromDB(params model.GetLogsRequest, aggs model.AggsParam) (model.StatsAggResult, error) {
 	ctx := context.Background()
 
-	var query string
-	switch aggs.Interval {
-	case "1m", "5m", "1h", "1d":
-		query = fmt.Sprintf("SELECT %s, COUNT(*) as count FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? GROUP BY toStartOfInterval(timestamp, INTERVAL %s) ORDER BY toStartOfInterval(timestamp, INTERVAL %s)", aggs.Field, aggs.Interval, aggs.Interval)
-	default:
-		query = fmt.Sprintf("SELECT %s, COUNT(*) as count FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? GROUP BY %s", aggs.Field, aggs.Field)
+	// Primero detectamos el tipo de la columna
+	typeQuery := fmt.Sprintf("SELECT toTypeName(%s) FROM logs WHERE sourceid = ? LIMIT 1", aggs.Field)
+	typeRow := db.conn.QueryRow(ctx, typeQuery, params.SourceID)
+	var colTypeName string
+	if err := typeRow.Scan(&colTypeName); err != nil {
+		return model.StatsAggResult{}, fmt.Errorf("failed to detect column type: %w", err)
 	}
 
-	rows, err := db.conn.Query(ctx, query, params.SourceID, params.TimestampFrom, params.TimestampTo)
+	// Según el tipo, construimos la expresión adecuada
+	isDatetime := strings.HasPrefix(colTypeName, "Date")
+	var numericExpr string
+	if isDatetime {
+		numericExpr = fmt.Sprintf("toUnixTimestamp(%s)", aggs.Field)
+	} else {
+		numericExpr = fmt.Sprintf("toFloat64OrNull(toString(%s))", aggs.Field)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT COUNT(*),
+			AVGOrNull(%s),
+			MINOrNull(%s),
+			MAXOrNull(%s),
+			SUMOrNull(%s)
+		FROM logs
+		WHERE sourceid = ?;`,
+		numericExpr, numericExpr, numericExpr, numericExpr,
+	)
+
+	rows, err := db.conn.Query(ctx, query, params.SourceID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query aggs: %w", err)
+		return model.StatsAggResult{}, fmt.Errorf("failed to query aggs: %w", err)
 	}
 	defer rows.Close()
 
-	var buckets []model.AggsBucket
+	var result model.StatsAggResult
 	for rows.Next() {
-		var bucket model.AggsBucket
-		if err := rows.Scan(&bucket.Key, &bucket.DocCount); err != nil {
-			return nil, fmt.Errorf("failed to scan aggs row: %w", err)
+		var count uint64
+
+		if isDatetime {
+			var (
+				avg *float64
+				min *uint32
+				max *uint32
+				sum *uint64
+			)
+			if err := rows.Scan(&count, &avg, &min, &max, &sum); err != nil {
+				return model.StatsAggResult{}, fmt.Errorf("failed to scan aggs row: %w", err)
+			}
+			result.Count = count
+			result.Avg = avg
+			if min != nil {
+				f := float64(*min)
+				result.Min = &f
+			}
+			if max != nil {
+				f := float64(*max)
+				result.Max = &f
+			}
+			if sum != nil {
+				f := float64(*sum)
+				result.Sum = &f
+			}
+		} else {
+			var (
+				avg *float64
+				min *float64
+				max *float64
+				sum *float64
+			)
+			if err := rows.Scan(&count, &avg, &min, &max, &sum); err != nil {
+				return model.StatsAggResult{}, fmt.Errorf("failed to scan aggs row: %w", err)
+			}
+			result.Count = count
+			result.Avg = avg
+			result.Min = min
+			result.Max = max
+			result.Sum = sum
 		}
-		buckets = append(buckets, bucket)
+
+		result.Field = aggs.Field
+		result.IsDatetime = isDatetime
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating aggs rows: %w", err)
-	}
-
-	return buckets, nil
+	return result, rows.Err()
 }
 
 func (db *ClickHouseDB) CountLogsFromDB(params model.GetLogsRequest) (int, error) {

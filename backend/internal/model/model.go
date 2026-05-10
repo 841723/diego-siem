@@ -5,6 +5,16 @@ import (
 	"time"
 )
 
+/*
+**************************************************************
+
+	Data Models
+
+**************************************************************
+*/
+
+// type ID defined in id.go
+
 type LogData = map[string]interface{}
 
 type Log struct {
@@ -115,4 +125,21 @@ type AggsBucket struct {
 	Key      interface{} `json:"key"`
 	Value    interface{} `json:"value,omitempty"`
 	DocCount int         `json:"doc_count,omitempty"`
+}
+
+/*
+**************************************************************
+
+	Utility Functions
+
+**************************************************************
+*/
+type StatsAggResult struct {
+	Field      string   `json:"field"`
+	Count      uint64   `json:"count"`
+	Avg        *float64 `json:"avg"`
+	Min        *float64 `json:"min"`
+	Max        *float64 `json:"max"`
+	Sum        *float64 `json:"sum"`
+	IsDatetime bool     `json:"is_datetime"` // útil para que el frontend formatee los valores
 }

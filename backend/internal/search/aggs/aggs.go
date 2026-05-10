@@ -8,7 +8,12 @@ import (
 )
 
 type AggMeta struct {
-	Name string `json:"name"`
+	Name      string          `json:"name"`
+	AggsParam model.AggsParam `json:"aggs_param"`
+}
+
+func WithAggMeta(name string, aggsParam model.AggsParam) AggMeta {
+	return AggMeta{Name: name, AggsParam: aggsParam}
 }
 
 type Agg interface {
@@ -37,4 +42,23 @@ func Aggregate(storage *storage.Storage, aggsConfig model.AggsParam, req model.G
 		return nil, err
 	}
 	return aggs.Aggregate(storage, req)
+}
+
+
+/*
+***********************************************************
+
+						Helper functions
+						
+***********************************************************
+*/
+
+func filterBucketsByKey(buckets []model.AggsBucket, key string) []model.AggsBucket {
+	var filtered []model.AggsBucket
+	for _, bucket := range buckets {
+		if bucket.Key == key {
+			filtered = append(filtered, bucket)
+		}
+	}
+	return filtered
 }
