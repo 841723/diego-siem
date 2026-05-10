@@ -49,7 +49,7 @@ def create_log_generator(
         except Exception as e:
             print("error:", e)
 
-        delay = random.uniform(0.1, 1.0)
+        delay = random.uniform(0.001, 0.01)
         time.sleep(delay)
 
 
@@ -99,3 +99,22 @@ if __name__ == "__main__":
 
     for p in processes:
         p.join()
+
+
+"""
+periodo: (max sleep - min sleep) / 2 = (0.01 - 0.001) / 2 = 0.0045 s
+
+1 proceso:  1 log  / 0.0045 s = 222.22 logs/s
+3 procesos: 3 logs / 0.0045 s = 666.67 logs/s
+
+
+40863 row(s) fetched - 0.118s (0.099s fetch), on 2026-05-10 at 19:42:00
+44221 row(s) fetched - 0.135s (0.109s fetch), on 2026-05-10 at 19:44:00
+
+59897 row(s) fetched - 0.276s (0.237s fetch), on 2026-05-10 at 19:54:02
+73330 row(s) fetched - 0.266s (0.204s fetch), on 2026-05-10 at 20:01:50
+78696 row(s) fetched - 0.266s (0.243s fetch), on 2026-05-10 at 20:04:58
+
+
+11201 logs in 656 s = 17.07 logs/s
+"""
