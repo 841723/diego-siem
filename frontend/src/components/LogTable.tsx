@@ -45,7 +45,7 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
                 {logs.map((log) => (
                     <div
                         key={log._row_key}
-                        className='grid odd:bg-primary/60 even:bg-primary/20 odd:text-text even:text-muted hover:bg-accent cursor-default'
+                        className='grid odd:bg-primary/60 even:bg-primary/20 font-bold odd:text-text even:text-muted hover:bg-accent cursor-default'
                         style={{
                             gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`,
                         }}
@@ -53,7 +53,7 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
                         {columns.map((col, idx) => (
                             <div
                                 key={col}
-                                className='group relative p-1 border-3 border-transparent text-xs wrap-break-word my-auto hover:border-primary hover:rounded-r hover:rounded-b h-full'
+                                className='group relative p-1 border-3 border-transparent text-md wrap-break-word my-auto hover:border-primary hover:rounded-r hover:rounded-b h-full'
                             >
                                 <span className='line-clamp-2 font-mono'>
                                     {getCellValue(loading, log, col)}
