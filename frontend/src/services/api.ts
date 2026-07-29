@@ -160,21 +160,21 @@ export async function getLogs(
             size,
             query: {},
             aggs: [
-                {
-                    name: "total",
-                    type: "count",
-                    field: "timestamp",
-                },
-                {
-                    name: "mean_numseq",
-                    type: "avg",
-                    field: "numseq",
-                },
-                {
-                    name: "stats_timestamp",
-                    type: "stats",
-                    field: "timestamp",
-                },
+                // {
+                //     name: "total",
+                //     type: "count",
+                //     field: "timestamp",
+                // },
+                // {
+                //     name: "mean_numseq",
+                //     type: "avg",
+                //     field: "numseq",
+                // },
+                // {
+                //     name: "stats_timestamp",
+                //     type: "stats",
+                //     field: "timestamp",
+                // },
             ],
         }),
     });

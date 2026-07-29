@@ -79,7 +79,7 @@ APP_NAME = "mini-siem"
 PROCID = "-"
 MSGID = "-"
 
-num_processes = 3
+num_processes = 0
 
 if __name__ == "__main__":
     processes = []

@@ -10,7 +10,6 @@ import (
 // now:::now-1h -> timestampFrom, timestampTo
 
 func FormatTimeWindowToUnix(timeWindow string) (string, string, error) {
-	fmt.Printf("Formatting time window: %s\n", timeWindow)
 	if timeWindow == "all" {
 		return "0", strconv.FormatInt(^int64(0), 10), nil // from 1970 to max int64
 	}
@@ -28,7 +27,6 @@ func FormatTimeWindowToUnix(timeWindow string) (string, string, error) {
 	}
 
 	timestampTo, err := parseTimeExpression(parts[0], now)
-	fmt.Printf("Parsed timestamp to: %d\n", timestampTo)
 	if err != nil {
 		return "", "", fmt.Errorf("invalid time expression: %w", err)
 	}

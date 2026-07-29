@@ -122,7 +122,9 @@ func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsRequest, dynamicColumn
 		strings.Join(allColumns, ", "),
 	)
 	rows, err := db.conn.Query(ctx, query, params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
+	// if no rows are returned, return an empty slice instead of an error
 	if err != nil {
+		fmt.Printf("Error querying logs: %v\n", err)
 		return nil, err
 	}
 	defer rows.Close()

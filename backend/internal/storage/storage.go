@@ -112,7 +112,6 @@ func (s *Storage) StoreLog(log model.Log) error {
 }
 
 func (s *Storage) GetLogs(params model.GetLogsRequest) ([]model.Log, error) {
-	fmt.Printf("Received GetLogs request with TimeWindow: %s\n", params.TimeWindow)
 	dynamicColumns, err := s.GetMappings()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mappings: %w", err)

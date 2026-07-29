@@ -39,14 +39,22 @@ func (h *LogsHandler) GetLogs(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	sources, err := h.storage.GetLogs(body)
+	count, err := h.storage.CountLogs(body)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	count, err := h.storage.CountLogs(body)
+	if count == 0 {
+		c.JSON(http.StatusOK, model.GetLogsResponse{
+			Logs:  []model.Log{},
+			Total: 0,
+			Aggs:  map[string][]model.AggsBucket{},
+		})
+		return
+	}
+
+	sources, err := h.storage.GetLogs(body)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -61,7 +69,7 @@ func (h *LogsHandler) GetLogs(c *gin.Context) {
 	response := model.GetLogsResponse{
 		Logs:  sources,
 		Total: count,
-		Aggs:  aggs, // Placeholder for actual aggs
+		Aggs:  aggs,
 	}
 
 	c.JSON(http.StatusOK, response)

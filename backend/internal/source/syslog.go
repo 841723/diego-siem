@@ -9,7 +9,8 @@ import (
 
 	"backend/internal/model"
 
-	"github.com/influxdata/go-syslog/v3/rfc5424"
+	// "github.com/influxdata/go-syslog/v3/rfc5424"
+	"github.com/influxdata/go-syslog/v3/rfc3164"
 )
 
 type SyslogServer struct {
@@ -38,7 +39,8 @@ func (s *SyslogServer) Start() {
 		}
 
 		raw := string(buf[:n])
-		// fmt.Printf("Received raw syslog message: %s\n", raw)
+		fmt.Printf("Received raw syslog message: %s\n", raw)
+
 		go func() {
 			parsedLog, err := parseSyslog(raw, s.cfg.ID)
 			if err != nil {
@@ -64,14 +66,16 @@ func StartSyslogServer(cfg model.SourceConfig, outChannel chan<- model.Log) {
 }
 
 func parseSyslog(raw string, source model.ID) (*model.Log, error) {
-	p := rfc5424.NewParser(rfc5424.WithBestEffort())
+	p := rfc3164.NewParser(
+		rfc3164.WithYear(rfc3164.CurrentYear{}),
+	)
 
 	m, err := p.Parse([]byte(raw))
 	if err != nil {
 		return nil, err
 	}
 
-	sm := m.(*rfc5424.SyslogMessage)
+	sm := m.(*rfc3164.SyslogMessage)
 
 	ts := time.Now()
 	if sm.Timestamp != nil {

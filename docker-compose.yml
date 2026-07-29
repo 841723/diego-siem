@@ -4,11 +4,13 @@ services:
     container_name: siem-backend
     ports:
       - "8080:8080"
+      - "9000-9099:9000-9099"
+      - "9000-9099:9000-9099/udp"
     volumes:
       - ./backend:/app
     environment:
       - CLICKHOUSE_HOST=clickhouse
-      - CLICKHOUSE_PORT=9000
+      - CLICKHOUSE_PORT=8529
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_USER=siem
@@ -47,7 +49,7 @@ services:
     container_name: siem-clickhouse
     ports:
       - "8123:8123"   # HTTP interface
-      - "9000:9000"   # native protocol
+      - "8529:9000"   # native protocol
     environment:
       - CLICKHOUSE_DB=siem
       - CLICKHOUSE_USER=default
