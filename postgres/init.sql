@@ -2,8 +2,6 @@ DROP TABLE IF EXISTS Protocol CASCADE;
 DROP TABLE IF EXISTS Pipeline CASCADE;
 DROP TABLE IF EXISTS Processor CASCADE;
 DROP TABLE IF EXISTS PipelineProcessor CASCADE;
-DROP TABLE IF EXISTS MappingType CASCADE;
-DROP TABLE IF EXISTS Mapping CASCADE;
 DROP TABLE IF EXISTS SourceConfig CASCADE;
 
 
@@ -34,19 +32,6 @@ CREATE TABLE PipelineProcessor (
     HumanDescription TEXT,
     FOREIGN KEY (PipelineID) REFERENCES Pipeline(ID),
     FOREIGN KEY (ProcessorID) REFERENCES Processor(ID)
-);
-
-CREATE TABLE MappingType (
-    ID UUID PRIMARY KEY,
-    TypeName VARCHAR(50) NOT NULL UNIQUE,
-    DisplayName VARCHAR(255) NOT NULL UNIQUE
-);
-
-CREATE TABLE Mapping (
-    FieldName VARCHAR(255) PRIMARY KEY,
-    FieldTypeID UUID NOT NULL,
-    DefaultValue VARCHAR(255),
-    FOREIGN KEY (FieldTypeID) REFERENCES MappingType(ID)
 );
 
 CREATE TABLE SourceConfig (
@@ -117,44 +102,6 @@ INSERT INTO Protocol (Name) VALUES ('tcp'), ('udp');
 
     INSERT INTO Pipeline (ID, Name, Description) VALUES 
     ('7b9c1d2e-3f4a-4b5c-8d6e-9f0a1b2c3d4e', 'Another Pipeline', 'Another processing pipeline for network data.');
-
--- mapping types
-    INSERT INTO MappingType (ID, TypeName, DisplayName) VALUES 
-    ('2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e', 'int', 'Integer');
-
-    INSERT INTO MappingType (ID, TypeName, DisplayName) VALUES 
-    ('3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f', 'float', 'Float');
-
-    INSERT INTO MappingType (ID, TypeName, DisplayName) VALUES 
-    ('4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a', 'decimal', 'Decimal');
-
-    INSERT INTO MappingType (ID, TypeName, DisplayName) VALUES 
-    ('5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b', 'date', 'Date');
-
-    INSERT INTO MappingType (ID, TypeName, DisplayName) VALUES 
-    ('6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c', 'datetime', 'DateTime');
-
-    INSERT INTO MappingType (ID, TypeName, DisplayName) VALUES 
-    ('7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d', 'time', 'Time');
-
-    INSERT INTO MappingType (ID, TypeName, DisplayName) VALUES    
-    ('7a8b9c0d-1e2f-3a4b-546d-7e8f9a0b1c2d', 'string', 'String');
-
-    INSERT INTO MappingType (ID, TypeName, DisplayName) VALUES 
-    ('8b9c0d1e-2f3a-4b5c-6d7e-8f9a0b1c2d3e', 'ipv4', 'IPv4');
-
-    INSERT INTO MappingType (ID, TypeName, DisplayName) VALUES 
-    ('9c0d1e2f-3a4b-5c6d-7e8f-9a0b1c2d3e4f', 'ipv6', 'IPv6');
-
-    INSERT INTO MappingType (ID, TypeName, DisplayName) VALUES 
-    ('0d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a', 'uuid', 'UUID');
-
-    INSERT INTO MappingType (ID, TypeName, DisplayName) VALUES 
-    ('1e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b', 'bool', 'Boolean');
-
-    INSERT INTO MappingType (ID, TypeName, DisplayName) VALUES 
-    ('2f3a4b5c-6d7e-8f9a-0b1c-2d3e4f5a6b7c', 'array', 'Array');
-
 
 -- INSERT INTO SourceConfig (Port, Protocol, Parser, Name, PipelineID) VALUES 
 -- (9001, 'udp', 'syslog_parser', 'Default Source', 1);

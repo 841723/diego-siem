@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"reflect"
 	"strings"
 	"time"
 
@@ -106,21 +105,11 @@ func (db *ClickHouseDB) LogToDB(log map[string]interface{}) error {
 	return nil
 }
 
-func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsRequest, dynamicColumns []model.Mapping) ([]model.Log, error) {
+func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsRequest) ([]model.Log, error) {
 	ctx := context.Background()
 
-	fixedColumns := []string{"logid", "timestamp", "sourceid", "data"}
+	query := "SELECT raw, logid, data, sourceid, timestamp FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?"
 
-	allColumns := make([]string, len(fixedColumns), len(fixedColumns)+len(dynamicColumns))
-	copy(allColumns, fixedColumns)
-	for _, col := range dynamicColumns {
-		allColumns = append(allColumns, col.FieldName)
-	}
-
-	query := fmt.Sprintf(
-		"SELECT %s FROM logs WHERE sourceid = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
-		strings.Join(allColumns, ", "),
-	)
 	rows, err := db.conn.Query(ctx, query, params.SourceID, params.TimestampFrom, params.TimestampTo, params.Size, params.From)
 	// if no rows are returned, return an empty slice instead of an error
 	if err != nil {
@@ -128,40 +117,27 @@ func (db *ClickHouseDB) GetLogsFromDB(params model.GetLogsRequest, dynamicColumn
 		return nil, err
 	}
 	defer rows.Close()
-	columnTypes := rows.ColumnTypes()
 
 	var results []model.Log
 
 	for rows.Next() {
 		var (
+			raw       string
 			id        model.ID
 			timestamp time.Time
 			sourceID  model.ID
 			data      map[string]any
 		)
 
-		scanTargets := make([]any, len(allColumns))
-		scanTargets[0] = &id
-		scanTargets[1] = &timestamp
-		scanTargets[2] = &sourceID
-		scanTargets[3] = &data
-
-		for i := range dynamicColumns {
-			ptr := reflect.New(columnTypes[len(fixedColumns)+i].ScanType())
-			scanTargets[len(fixedColumns)+i] = ptr.Interface()
-		}
-
-		if err := rows.Scan(scanTargets...); err != nil {
+		if err := rows.Scan(&raw, &id, &data, &sourceID, &timestamp); err != nil {
+			fmt.Printf("Error scanning row: %v\n", err)
 			return nil, err
 		}
 
 		logData := model.LogData(data)
-		for i, col := range dynamicColumns {
-			ptr := scanTargets[len(fixedColumns)+i]
-			logData[col.FieldName] = reflect.ValueOf(ptr).Elem().Interface()
-		}
 
 		results = append(results, model.Log{
+			Raw:       raw,
 			ID:        id,
 			Timestamp: timestamp,
 			SourceID:  sourceID,

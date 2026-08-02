@@ -27,16 +27,6 @@ export default function App() {
                 <Route path="/sources/:id" element={<SourceDetailPage />} />
                 <Route path="/sources/:id/edit" element={<SourceFormPage />} />
 
-                {/* Global Mapping */}
-                <Route path="/mapping" element={<MappingsPage />} />
-                <Route path="/mapping/new" element={<MappingFormPage />} />
-                <Route path="/mapping/:id/edit" element={<MappingFormPage />} />
-                {/* Legacy redirect: old per-mapping routes → global mapping page */}
-                <Route path="/mappings" element={<Navigate to="/mapping" replace />} />
-                <Route path="/mappings/new" element={<MappingFormPage />} />
-                <Route path="/mappings/:id" element={<MappingDetailPage />} />
-                <Route path="/mappings/:id/edit" element={<MappingFormPage />} />
-
                 {/* Pipelines */}
                 <Route path="/pipelines" element={<PipelinesPage />} />
                 <Route path="/pipelines/new" element={<PipelineFormPage />} />

@@ -40,14 +40,8 @@ func (a *App) initAPI() {
 	// 	/sources
 	routes.SourcesRegisterRoutes(r, &a.sources, &a.storages)
 
-	// 	/schema
-	routes.SchemaRegisterRoutes(r, &a.storages)
-
 	// 	/pipelines and /pipelines/:id/processors
 	routes.PipelinesRegisterRoutes(r, &a.sources, &a.storages)
-
-	// 	/mappings
-	routes.MappingRegisterRoutes(r, &a.storages)
 
 	// 	/processors
 	routes.ProcessorsRegisterRoutes(r, &a.storages)

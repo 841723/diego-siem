@@ -80,43 +80,18 @@ func formatLogForStorage(value interface{}, fieldType string) (interface{}, erro
 
 func (s *Storage) StoreLog(log model.Log) error {
 	logToStore := map[string]interface{}{
+		"raw":       log.Raw,
 		"timestamp": log.Timestamp,
 		"sourceid":  log.SourceID,
 		"logid":     log.ID,
+		"data":      log.Data,
 	}
-
-	mappings, err := s.GetMappings()
-	if err != nil {
-		return fmt.Errorf("failed to get mappings: %w", err)
-	}
-
-	for _, mapping := range mappings {
-		var valueToFormat interface{}
-		if value, ok := log.Data[mapping.FieldName]; ok {
-			valueToFormat = value
-		} else if mapping.DefaultValue != "" {
-			valueToFormat = mapping.DefaultValue
-		} else {
-			valueToFormat = nil
-		}
-		formattedValue, err := formatLogForStorage(valueToFormat, mapping.FieldType.TypeName)
-		if err == nil {
-			logToStore[mapping.FieldName] = formattedValue
-			delete(log.Data, mapping.FieldName)
-		}
-	}
-
-	logToStore["data"] = log.Data
 
 	return s.clickhouse.LogToDB(logToStore)
 }
 
 func (s *Storage) GetLogs(params model.GetLogsRequest) ([]model.Log, error) {
-	dynamicColumns, err := s.GetMappings()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get mappings: %w", err)
-	}
-	return s.clickhouse.GetLogsFromDB(params, dynamicColumns)
+	return s.clickhouse.GetLogsFromDB(params)
 }
 
 func (s *Storage) CountLogs(params model.GetLogsRequest) (int, error) {
@@ -176,30 +151,11 @@ func (s *Storage) DeleteSourceByID(sourceID model.ID) error {
 	return s.postgres.DeleteSourceByIDFromDB(sourceID)
 }
 
-/*******************************************************
-
-						Columns
-
-**********************************************************/
-
-func (s *Storage) AddColumnToLogs(columnName, dataType string) error {
-	if ok, err := s.postgres.IsValidMappingType(dataType); !ok {
-		return fmt.Errorf("invalid mapping type: %w", err)
-	}
-	return s.clickhouse.AddColumnToLogsInDB(columnName, dataType)
-}
-
-func (s *Storage) RemoveColumnFromLogs(columnName string) error {
-	return s.clickhouse.RemoveColumnFromLogsInDB(columnName)
-}
-
-/*
-*********************************************************
+/**********************************************************
 
 	Pipelines
 
-*********************************************************
-*/
+**********************************************************/
 func (s *Storage) AddPipeline(pipeline model.Pipeline) (model.ID, error) {
 	return s.postgres.AddPipelineToDB(pipeline)
 }
@@ -362,137 +318,4 @@ func (s *Storage) GetAllProcessors() ([]model.Processor, error) {
 
 func (s *Storage) GetProcessorsByID(pipelineID model.ID) ([]model.Processor, error) {
 	return s.postgres.GetProcessorsByIDFromDB(pipelineID)
-}
-
-/*
-*********************************************************
-
-	Mappings
-
-*********************************************************
-*/
-func (s *Storage) SetMappings(mappings []model.Mapping) error {
-	existingMappings, err := s.GetMappings()
-	if err != nil {
-		return fmt.Errorf("failed to get existing mappings: %w", err)
-	}
-
-	existingMappingMap := make(map[string]model.Mapping)
-	for _, mapping := range existingMappings {
-		existingMappingMap[mapping.FieldName] = mapping
-	}
-
-	for _, mapping := range mappings {
-		if existing, exists := existingMappingMap[mapping.FieldName]; exists {
-			if existing.FieldTypeID != mapping.FieldTypeID || existing.DefaultValue != mapping.DefaultValue {
-				// Mapping has changed, update it
-				err := s.DeleteMapping(mapping.FieldName)
-				if err != nil {
-					return fmt.Errorf("failed to delete existing mapping for field %s: %w", mapping.FieldName, err)
-				}
-				err = s.AddMapping(mapping)
-				if err != nil {
-					return fmt.Errorf("failed to add updated mapping for field %s: %w", mapping.FieldName, err)
-				}
-			}
-			delete(existingMappingMap, mapping.FieldName)
-		} else {
-			// New mapping, add it
-			err := s.AddMapping(mapping)
-			if err != nil {
-				return fmt.Errorf("failed to add new mapping for field %s: %w", mapping.FieldName, err)
-			}
-		}
-	}
-
-	for fieldName := range existingMappingMap {
-		// Mapping was removed, delete it
-		err := s.DeleteMapping(fieldName)
-		if err != nil {
-			return fmt.Errorf("failed to delete old mapping for field %s: %w", fieldName, err)
-		}
-	}
-	return nil
-}
-
-func (s *Storage) AddMapping(mapping model.Mapping) error {
-	var err error
-	var mappingExists bool
-	_, mappingExists, err = s.postgres.GetMappingByFieldNameFromDB(mapping.FieldName)
-	if err != nil {
-		return fmt.Errorf("failed to check if mapping exists: %w", err)
-	}
-	if mappingExists {
-		return nil
-	}
-
-	err = s.postgres.AddMappingToDB(mapping)
-	if err != nil {
-		return err
-	}
-
-	mapping.FieldType, err = s.GetMappingTypesByID(mapping.FieldTypeID)
-	if err != nil {
-		return fmt.Errorf("failed to get mapping type: %w", err)
-	}
-
-	err = s.AddColumnToLogs(mapping.FieldName, mapping.FieldType.TypeName)
-	if err != nil {
-		// Rollback mapping addition if adding column fails
-		rollbackErr := s.postgres.DeleteMappingFromDB(mapping.FieldName)
-		if rollbackErr != nil {
-			fmt.Printf("Failed to rollback mapping addition for field %s: %v\n", mapping.FieldName, rollbackErr)
-		}
-		return fmt.Errorf("failed to add column for mapping: %w", err)
-	}
-	return nil
-}
-
-func (s *Storage) GetMappings() ([]model.Mapping, error) {
-	return s.postgres.GetMappingsFromDB()
-}
-
-func (s *Storage) DeleteMapping(mappingID string) error {
-	err := s.RemoveColumnFromLogs(mappingID)
-	if err != nil {
-		fmt.Printf("Failed to remove column for mapping %s: %v\n", mappingID, err)
-		// Proceed with deleting the mapping even if column removal fails
-	}
-
-	err = s.postgres.DeleteMappingFromDB(mappingID)
-	if err != nil {
-		return fmt.Errorf("failed to delete mapping from DB: %w", err)
-	}
-	return nil
-}
-
-func (s *Storage) DeleteAllMappings() error {
-	mappings, err := s.postgres.GetMappingsFromDB()
-	if err != nil {
-		return fmt.Errorf("failed to get mappings: %w", err)
-	}
-
-	for _, mapping := range mappings {
-		err = s.DeleteMapping(mapping.FieldName)
-		if err != nil {
-			return fmt.Errorf("failed to delete mapping %s: %w", mapping.FieldName, err)
-		}
-	}
-	return nil
-}
-
-/*
-**********************************************************
-
-	Mapping Types
-
-*********************************************************
-*/
-
-func (s *Storage) GetMappingTypes() ([]model.MappingType, error) {
-	return s.postgres.GetMappingTypesFromDB()
-}
-
-func (s *Storage) GetMappingTypesByID(typeID model.ID) (model.MappingType, error) {
-	return s.postgres.GetMappingTypeByIDFromDB(typeID)
 }

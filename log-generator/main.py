@@ -49,7 +49,7 @@ def create_log_generator(
         except Exception as e:
             print("error:", e)
 
-        delay = random.uniform(0.001, 0.01)
+        delay = random.uniform(0.5, 1.5)  # Random delay between 0.5 and 1.5 seconds
         time.sleep(delay)
 
 
@@ -79,7 +79,7 @@ APP_NAME = "mini-siem"
 PROCID = "-"
 MSGID = "-"
 
-num_processes = 0
+num_processes = 1
 
 if __name__ == "__main__":
     processes = []

@@ -1,16 +1,14 @@
 package source
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"time"
 
+	"backend/internal/lib/parsing"
 	"backend/internal/model"
-
 	// "github.com/influxdata/go-syslog/v3/rfc5424"
-	"github.com/influxdata/go-syslog/v3/rfc3164"
 )
 
 type SyslogServer struct {
@@ -39,13 +37,21 @@ func (s *SyslogServer) Start() {
 		}
 
 		raw := string(buf[:n])
-		fmt.Printf("Received raw syslog message: %s\n", raw)
+		// fmt.Printf("Received raw syslog message: %s\n", raw)
 
 		go func() {
-			parsedLog, err := parseSyslog(raw, s.cfg.ID)
+			ts := time.Now()
+			parsedLogData, err := parseSyslog(raw)
 			if err != nil {
 				log.Printf("Error parsing syslog message: %v\n", err)
 				return
+			}
+			parsedLog := &model.Log{
+				Raw:       raw,
+				ID:        model.GenerateUUID(),
+				Timestamp: ts,
+				SourceID:  s.cfg.ID,
+				Data:      *parsedLogData,
 			}
 
 			s.outChannel <- *parsedLog
@@ -65,43 +71,10 @@ func StartSyslogServer(cfg model.SourceConfig, outChannel chan<- model.Log) {
 	go syslogServer.Start()
 }
 
-func parseSyslog(raw string, source model.ID) (*model.Log, error) {
-	p := rfc3164.NewParser(
-		rfc3164.WithYear(rfc3164.CurrentYear{}),
-	)
-
-	m, err := p.Parse([]byte(raw))
+func parseSyslog(raw string) (*model.LogData, error) {
+	logdata, err := parsing.Parse(raw)
 	if err != nil {
 		return nil, err
 	}
-
-	sm := m.(*rfc3164.SyslogMessage)
-
-	ts := time.Now()
-	if sm.Timestamp != nil {
-		ts = *sm.Timestamp
-	}
-
-	payload := make(map[string]interface{})
-
-	if sm.Message != nil {
-		msg := *sm.Message
-
-		if json.Valid([]byte(msg)) {
-			if err := json.Unmarshal([]byte(msg), &payload); err != nil {
-				payload["message"] = msg
-			}
-		} else {
-			payload["message"] = msg
-		}
-	} else {
-		payload = map[string]interface{}{}
-	}
-
-	return &model.Log{
-		ID:        model.GenerateUUID(),
-		Timestamp: ts,
-		SourceID:  source,
-		Data:      payload,
-	}, nil
+	return logdata, nil
 }

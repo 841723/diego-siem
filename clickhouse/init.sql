@@ -1,6 +1,7 @@
 DROP TABLE IF EXISTS logs;
 
 CREATE TABLE logs (
+    raw String,
     logid UUID, 
     data JSON,
     sourceid UUID,

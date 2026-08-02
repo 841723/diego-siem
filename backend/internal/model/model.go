@@ -18,6 +18,7 @@ import (
 type LogData = map[string]interface{}
 
 type Log struct {
+	Raw       string    `json:"raw"`
 	ID        ID        `json:"id"`
 	Timestamp time.Time `json:"timestamp"`
 	SourceID  ID        `json:"sourceid"`
