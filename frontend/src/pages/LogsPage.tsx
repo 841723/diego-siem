@@ -30,13 +30,11 @@ export default function LogsPage() {
         setFilterText,
         toggleColumn,
         setPage,
-        filteredLogs,
         paginatedLogs,
         availableColumns,
         totalPages,
         logsLoading,
         logsError,
-        refetchLogs,
     } = filters;
 
     return (
@@ -78,13 +76,6 @@ export default function LogsPage() {
                     renderOption={(item) => item.label}
                     label='Ventana'
                 />
-                <button
-                    className='self-end rounded bg-accent px-3 py-2 text-sm text-muted font-semibold uppercase tracking-wider hover:bg-accent/80 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 h-[37.6px] w-20'
-                    onClick={refetchLogs}
-                    disabled={logsLoading}
-                >
-                    {logsLoading ? "..." : "Buscar"}
-                </button>
             </header>
 
             <section className='overflow-hidden grid grid-cols-[1fr_7fr]'>
@@ -102,13 +93,13 @@ export default function LogsPage() {
                         logs={paginatedLogs}
                         columns={columns}
                     />
-                    {/* <Pagination
+                    <Pagination
                         currentPage={page}
                         totalPages={totalPages}
                         onPageChange={setPage}
                         shownCount={paginatedLogs.length}
-                        totalCount={filteredLogs.length}
-                    /> */}
+                        totalCount={totalLogs}
+                    />
                 </div>
             </section>
         </main>

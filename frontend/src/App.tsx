@@ -1,9 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import LogsPage from "./pages/LogsPage";
-import MappingDetailPage from "./pages/MappingDetailPage";
-import MappingFormPage from "./pages/MappingFormPage";
-import MappingsPage from "./pages/MappingsPage";
 import PipelineDetailPage from "./pages/PipelineDetailPage";
 import PipelineFormPage from "./pages/PipelineFormPage";
 import PipelinesPage from "./pages/PipelinesPage";
