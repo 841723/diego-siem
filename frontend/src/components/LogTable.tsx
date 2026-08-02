@@ -11,7 +11,21 @@ const getCellValue = (loading: boolean, log: LogEntry, col: string): string => {
     if (loading) return " ";
     if (col === "timestamp") return formatTimestamp(log.timestamp);
     if (col === "sourceid") return String(log.sourceid);
-    return formatCellValue(log.data?.[col]);
+    if (col === "raw") return formatCellValue(log.raw);
+
+    const topLevelValue = (log as Record<string, unknown>)[col];
+    if (topLevelValue !== undefined) return formatCellValue(topLevelValue);
+
+    const nestedValue = col
+        .split(".")
+        .reduce<unknown>(
+            (value, key) =>
+                value && typeof value === "object"
+                    ? (value as Record<string, unknown>)[key]
+                    : undefined,
+            log.data,
+        );
+    return formatCellValue(nestedValue);
 };
 
 export default function LogTable({ loading = true, logs, columns }: Props) {

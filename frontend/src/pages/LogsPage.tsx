@@ -60,13 +60,22 @@ export default function LogsPage() {
                     <label className='block text-xs font-semibold uppercase tracking-wider text-muted'>
                         Búsqueda
                     </label>
-                    <input
-                        type='text'
-                        placeholder='Buscar logs...'
-                        value={filterText}
-                        onChange={(e) => setFilterText(e.target.value)}
-                        className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:accent-accent'
-                    />
+                    <div className='flex gap-2'>
+                        <input
+                            type='text'
+                            placeholder='Buscar logs...'
+                            value={filterText}
+                            onChange={(e) => setFilterText(e.target.value)}
+                            className='w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text focus:accent-accent'
+                        />
+                        <button
+                            type='button'
+                            onClick={() => setFilterText(filterText)}
+                            className='rounded bg-accent px-4 py-2 text-sm font-semibold hover:bg-accent/80 active:bg-accent/90 text-white'
+                        >
+                            Buscar
+                        </button>
+                    </div>
                 </div>
                 <Select
                     list={TIME_WINDOWS}

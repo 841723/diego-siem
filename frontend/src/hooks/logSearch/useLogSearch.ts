@@ -18,6 +18,17 @@ function getNestedValue(data: Record<string, unknown> | undefined, path: string)
         );
 }
 
+function getLogFieldValue(log: LogEntry, field: string): unknown {
+    if (field === "timestamp") return log.timestamp;
+    if (field === "sourceid") return log.sourceid;
+    if (field === "raw") return log.raw;
+
+    const topLevelValue = (log as Record<string, unknown>)[field];
+    if (topLevelValue !== undefined) return topLevelValue;
+
+    return getNestedValue(log.data, field);
+}
+
 function parseSort(sort: string): { field: string; direction: "asc" | "desc" } {
     const [field, direction] = sort.split(":");
     return {
@@ -28,8 +39,7 @@ function parseSort(sort: string): { field: string; direction: "asc" | "desc" } {
 
 function getSortValue(log: LogEntry, field: string): unknown {
     if (field === "timestamp") return Date.parse(log.timestamp);
-    if (field === "sourceid") return log.sourceid;
-    return getNestedValue(log.data, field);
+    return getLogFieldValue(log, field);
 }
 
 function compareValues(a: unknown, b: unknown): number {
@@ -53,7 +63,7 @@ function filterLogs(logs: LogEntry[], query: string, columns: string[]): LogEntr
                 return String(log.sourceid).toLowerCase().includes(needle);
             }
 
-            return formatCellValue(getNestedValue(log.data, column))
+            return formatCellValue(getLogFieldValue(log, column))
                 .toLowerCase()
                 .includes(needle);
         }),
@@ -123,6 +133,7 @@ export function useLogSearch(filters: LogSearchFilters): {
 
     const availableColumns = useMemo(() => {
         const columns = new Set<string>(DEFAULT_COLUMNS);
+        columns.add("raw");
 
         filters.columns.forEach((column) => {
             columns.add(column);
