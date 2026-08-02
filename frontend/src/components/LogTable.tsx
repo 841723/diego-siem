@@ -45,7 +45,7 @@ export default function LogTable({ loading = true, logs, columns }: Props) {
                 {logs.map((log) => (
                     <div
                         key={log._row_key}
-                        className='grid odd:bg-primary/60 even:bg-primary/20 font-bold odd:text-text even:text-muted hover:bg-accent cursor-default'
+                        className='grid odd:bg-primary/60 even:bg-primary/20 odd:text-text even:text-muted hover:font-bold cursor-default'
                         style={{
                             gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`,
                         }}
